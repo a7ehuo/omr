@@ -1654,8 +1654,6 @@ int32_t       OMR::Options::_numUsableCompilationThreads = -1; // -1 means not i
 
 int32_t       OMR::Options::_trampolineSpacePercentage = 0; // 0 means no change from default
 
-bool          OMR::Options::_realTimeGC=false;
-
 bool          OMR::Options::_countsAreProvidedByUser = false;
 TR_YesNoMaybe OMR::Options::_startupTimeMatters = TR_maybe;
 
@@ -1890,6 +1888,7 @@ OMR::Options::Options(
    if (_suppressLogFileBecauseDebugObjectNotCreated && !optimizationPlan->isLogCompilation())
       _logFile = NULL;
 
+   _realTimeGC = false;
    }
 
 

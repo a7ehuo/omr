@@ -2299,7 +2299,7 @@ protected:
    bool                        _isVariableHeapSizeForBarrierRange0;
    bool                        _isVariableActiveCardTableBase;
 
-   static bool                 _realTimeGC;
+   bool                        _realTimeGC;
 
    static bool                 _sharedClassCache;
 
