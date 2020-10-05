@@ -12201,7 +12201,11 @@ static TR_YesNoMaybe isArrayCompTypeValueType(OMR::ValuePropagation *vp, TR::VPC
    {
    TR_YesNoMaybe isValueType = TR_maybe;
 
-   if (!TR::Compiler->om.areValueTypesEnabled())
+static char *disableValueTypesVPCompType = feGetEnv("TR_DisableValueTypesVPCompType");
+static TR::SimpleRegex * regex = disableValueTypesVPCompType ? TR::SimpleRegex::create(disableValueTypesVPCompType) : NULL;
+
+
+   if (!TR::Compiler->om.areValueTypesEnabled() || (regex && TR::SimpleRegex::match(regex, vp->comp()->signature())))
       {
       isValueType = TR_no;
       }
