@@ -81,6 +81,7 @@
    OPTIMIZATION(stringPeepholes)
    OPTIMIZATION(switchAnalyzer)
    OPTIMIZATION(compactLocals)
+   OPTIMIZATION(valueTypeOpLowering)
    OPTIMIZATION(varHandleTransformer)
    OPTIMIZATION(unsafeFastPath)
    OPTIMIZATION(recognizedCallTransformer)
