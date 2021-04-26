@@ -2546,11 +2546,6 @@ OMR::Z::CodeGenerator::getLinkageGlobalRegisterNumber(int8_t linkageRegisterInde
    TR_GlobalRegisterNumber result;
    bool isFloat = (type == TR::Float
                    || type == TR::Double
-#ifdef J9_PROJECT_SPECIFIC
-                   || type == TR::DecimalFloat
-                   || type == TR::DecimalDouble
-                   || type == TR::DecimalLongDouble
-#endif
                    );
 
    if (isFloat)
@@ -2689,11 +2684,6 @@ OMR::Z::CodeGenerator::getMaximumNumberOfGPRsAllowedAcrossEdge(TR::Node * node)
 
       isFloat = (dt == TR::Float
                  || dt == TR::Double
-#ifdef J9_PROJECT_SPECIFIC
-                 || dt == TR::DecimalFloat
-                 || dt == TR::DecimalDouble
-                 || dt == TR::DecimalLongDouble
-#endif
                  );
 
 #ifdef J9_PROJECT_SPECIFIC
@@ -2899,19 +2889,6 @@ OMR::Z::CodeGenerator::gprClobberEvaluate(TR::Node * node, bool force_copy, bool
 
          return targetRegister;
          }
-#ifdef J9_PROJECT_SPECIFIC
-      else if (node->getDataType() == TR::DecimalLongDouble)
-         {
-         TR::Register * targetRegister = self()->allocateFPRegisterPair();
-         cursor = generateRRInstruction(self(), TR::InstOpCode::LXR, node, targetRegister, srcRegister);
-         if (debugObj)
-            {
-            debugObj->addInstructionComment(toS390RRInstruction(cursor), CLOBBER_EVAL);
-            }
-
-         return targetRegister;
-         }
-#endif
       else if (node->getOpCode().isVector())
          {
          TR::Register * targetRegister = self()->allocateClobberableRegister(srcRegister);
@@ -2953,30 +2930,17 @@ OMR::Z::CodeGenerator::fprClobberEvaluate(TR::Node * node)
       {
       TR::Register * targetRegister;
       if (node->getDataType() == TR::Float
-#ifdef J9_PROJECT_SPECIFIC
-          || node->getDataType() == TR::DecimalFloat
-#endif
           )
          {
          targetRegister = self()->allocateRegister(TR_FPR);
          generateRRInstruction(self(), TR::InstOpCode::LER, node, targetRegister, srcRegister);
          }
       else if (node->getDataType() == TR::Double
-#ifdef J9_PROJECT_SPECIFIC
-               || node->getDataType() == TR::DecimalDouble
-#endif
                )
          {
          targetRegister = self()->allocateRegister(TR_FPR);
          generateRRInstruction(self(), TR::InstOpCode::LDR, node, targetRegister, srcRegister);
          }
-#ifdef J9_PROJECT_SPECIFIC
-      else if (node->getDataType() == TR::DecimalLongDouble)
-         {
-         targetRegister = self()->allocateFPRegisterPair();
-         generateRRInstruction(self(), TR::InstOpCode::LXR, node, targetRegister, srcRegister);
-         }
-#endif
       return targetRegister;
       }
    else
@@ -3849,9 +3813,6 @@ OMR::Z::CodeGenerator::createLiteralPoolSnippet(TR::Node * node)
             }
          break;
       case TR::Float:
-#ifdef J9_PROJECT_SPECIFIC
-      case TR::DecimalFloat:
-#endif
          union
             {
             float fvalue;
@@ -3861,9 +3822,6 @@ OMR::Z::CodeGenerator::createLiteralPoolSnippet(TR::Node * node)
          targetSnippet = self()->findOrCreate4ByteConstant(0, fival.ivalue);
          break;
       case TR::Double:
-#ifdef J9_PROJECT_SPECIFIC
-      case TR::DecimalDouble:
-#endif
          union
             {
             double dvalue;
@@ -4755,17 +4713,7 @@ OMR::Z::CodeGenerator::genLoadAddressToRegister(TR::Register *reg, TR::MemoryRef
 bool
 OMR::Z::CodeGenerator::usesImplicit64BitGPRs(TR::Node *node)
    {
-#ifdef J9_PROJECT_SPECIFIC
-   // packed/dfp conversion operations use GPR/FPR form conversions where the GPR is always a 64 bit register
-   return node->getOpCodeValue() == TR::pd2df ||
-          node->getOpCodeValue() == TR::pd2dd ||
-          node->getOpCodeValue() == TR::pd2de ||
-          node->getOpCodeValue() == TR::df2pd ||
-          node->getOpCodeValue() == TR::dd2pd ||
-          node->getOpCodeValue() == TR::de2pd;
-#else
    return false;
-#endif
    }
 
 bool OMR::Z::CodeGenerator::nodeRequiresATemporary(TR::Node *node)
@@ -5537,7 +5485,7 @@ bool OMR::Z::CodeGenerator::reliesOnAParticularSignEncoding(TR::Node *node)
    if (op.isIf())
       return false;
 
-   if (op.isConversion() && !node->getType().isBCD()) // e.g. pd2i,pd2l,pd2df etc
+   if (op.isConversion() && !node->getType().isBCD()) // e.g. pd2i,pd2l, etc.
       return false;
 
    // left shifts do not rely on a clean sign so the only thing to check is if a clean sign property has been propagated thru it (if not then can return false)
