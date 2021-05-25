@@ -2412,17 +2412,17 @@ TR::Node *constrainIaload(OMR::ValuePropagation *vp, TR::Node *node)
          {
          case TR::Symbol::Java_util_ArrayList_elementData:
             {
-//            if (base
-//                && base->getClassType()
-//                && base->getClassType()->asFixedClass()
-//                && base->getClassType()->asFixedClass()
-//                )
-            TR_ResolvedMethod *method = node->getSymbolReference()->getOwningMethod(vp->comp());
-            TR_OpaqueClassBlock *clazz = vp->fe()->getClassFromSignature("[Ljava/lang/Object;", 19, method);
-            if (clazz != NULL)
+            static char *recognizeArrayListThings = feGetEnv("TR_VPRecognizeArrayList");
+
+            if (recognizeArrayListThings)
                {
-               constraint = TR::VPFixedClass::create(vp, clazz);
-               vp->addGlobalConstraint(node, constraint);
+               TR_ResolvedMethod *method = node->getSymbolReference()->getOwningMethod(vp->comp());
+               TR_OpaqueClassBlock *clazz = vp->fe()->getClassFromSignature("[Ljava/lang/Object;", 19, method);
+               if (clazz != NULL)
+                  {
+                  constraint = TR::VPFixedClass::create(vp, clazz);
+                  vp->addGlobalConstraint(node, constraint);
+                  }
                }
 
             break;
