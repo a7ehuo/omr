@@ -2410,6 +2410,23 @@ TR::Node *constrainIaload(OMR::ValuePropagation *vp, TR::Node *node)
       TR::Symbol *sym = node->getSymbol();
       switch (sym->getRecognizedField())
          {
+         case TR::Symbol::Java_util_ArrayList_elementData:
+            {
+//            if (base
+//                && base->getClassType()
+//                && base->getClassType()->asFixedClass()
+//                && base->getClassType()->asFixedClass()
+//                )
+            TR_ResolvedMethod *method = node->getSymbolReference()->getOwningMethod(vp->comp());
+            TR_OpaqueClassBlock *clazz = vp->fe()->getClassFromSignature("[Ljava/lang/Object;", 19, method);
+            if (clazz != NULL)
+               {
+               constraint = TR::VPFixedClass::create(vp, clazz);
+               vp->addGlobalConstraint(node, constraint);
+               }
+
+            break;
+            }
          case TR::Symbol::Java_lang_String_value:
          case TR::Symbol::Java_lang_invoke_MethodHandle_thunks:
             if (!node->isNonNull() && performTransformation(vp->comp(), "%s[%p] recognized field is never null: %s\n", OPT_DETAILS, node, symRef->getName(vp->comp()->getDebug())))
