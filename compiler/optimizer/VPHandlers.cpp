@@ -2411,6 +2411,7 @@ TR::Node *constrainIaload(OMR::ValuePropagation *vp, TR::Node *node)
       switch (sym->getRecognizedField())
          {
          case TR::Symbol::Java_util_ArrayList_elementData:
+         case TR::Symbol::Com_ibm_rules_engine_fastpath_runtime_RuleInstanceImpl_bindings:
             {
             static char *recognizeArrayListThings = feGetEnv("TR_VPRecognizeArrayList");
 
