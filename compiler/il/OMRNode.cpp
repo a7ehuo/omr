@@ -3624,10 +3624,6 @@ OMR::Node::exceptionsRaised()
          break;
       case TR::ArrayStoreCHK:
          possibleExceptions |= TR::Block:: CanCatchArrayStoreCheck;
-         if (TR::Compiler->om.areValueTypesEnabled())
-            {
-            possibleExceptions |= TR::Block:: CanCatchNullCheck;
-            }
          break;
       case TR::ArrayCHK:
          possibleExceptions |= TR::Block:: CanCatchArrayStoreCheck;
