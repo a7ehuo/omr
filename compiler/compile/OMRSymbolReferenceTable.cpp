@@ -2110,12 +2110,16 @@ const char *OMR::SymbolReferenceTable::_commonNonHelperSymbolNames[] =
    "<contiguousArraySize>",
    "<discontiguousArraySize>",
    "<arrayClassRomPtr>",
+   "<classRomPtrSymbol>",
    "<javaLangClassFromClass>",
    "<classFromJavaLangClass>",
    "<addressOfClassOfMethod>",
+   "<ramStaticsFromClass>",
    "<componentClass>",
+   "<componentClassAsPrimitive>",
    "<isArray>",
    "<isClassAndDepthFlags>",
+   "<initializeStatusFromClassSymbol>",
    "<isClassFlags>",
    "<vft>",
    "<currentThread>",
@@ -2132,6 +2136,9 @@ const char *OMR::SymbolReferenceTable::_commonNonHelperSymbolNames[] =
    "<currentTimeMaxPrecision>",
    "<headerFlags>",
    "<singlePrecisionSQRT>",
+   "<threadPrivateFlags>",
+   "<arrayletSpineFirstElement>",
+   "<dltBlock>",
    "<countForRecompile>",
    "<gcrPatchPoint>",
    "<counterAddress>",
@@ -2148,11 +2155,24 @@ const char *OMR::SymbolReferenceTable::_commonNonHelperSymbolNames[] =
    "<potentialOSRPointHelper>",
    "<osrFearPointHelper>",
    "<eaEscapeHelper>",
+   "<lowTenureAddress>",
+   "<highTenureAddress>",
+   "<fragmentParent>",
+   "<globalFragment>",
    "<instanceShape>",
    "<instanceDescription>",
    "<descriptionWordFromPtr>",
+    "<classFromJavaLangClassAsPrimitive>",
+   "<javaVM>",
+   "<heapBase>",
+   "<heapTop>",
+   "<j9methodExtraField>",
+   "<j9methodConstantPool>",
+   "<startPCLinkageInfo>",
+   "<instanceShapeFromROMClass>",
    "<objectEqualityComparison>",
    "<objectInequalityComparison>",
+   "<objectInequalityInlineComparison>",
    "<nonNullableArrayNullStoreCheck>",
    "<synchronizedFieldLoad>",
    "<atomicAdd>",
@@ -2164,8 +2184,12 @@ const char *OMR::SymbolReferenceTable::_commonNonHelperSymbolNames[] =
    "<atomicSwap64Bit>",
    "<atomicCompareAndSwapReturnStatus>",
    "<atomicCompareAndSwapReturnValue>",
-   "<jProfileValueSymbol>",
-   "<jProfileValueWithNullCHKSymbol>"
+   "<jProfileValue>",
+   "<jProfileValueWithNullCHK>",
+   "<j9VMThreadTempSlotField>",
+   "<computedStaticCall>",
+   "<j9VMThreadFloatTemp1>",
+   "<J9JNIMethodIDvTableIndexField>",
    };
 
 
@@ -2175,8 +2199,19 @@ OMR::SymbolReferenceTable::getNonHelperSymbolName(CommonNonhelperSymbol nonHelpe
    TR_ASSERT_FATAL(nonHelper >= OMRfirstPrintableCommonNonhelperSymbol &&
                    nonHelper <= OMRlastPrintableCommonNonhelperSymbol,
                    "unknown non helper %" OMR_PRId32, static_cast<int32_t>(nonHelper));
-
 #if 0
+   TR_ASSERT_FATAL(sizeof(_commonNonHelperSymbolNames)/sizeof(_commonNonHelperSymbolNames[0]) ==
+                 static_cast<int32_t>(OMRlastPrintableCommonNonhelperSymbol - OMRfirstPrintableCommonNonhelperSymbol + 1),
+                 "_commonNonHelperSymbolNames %d array must match CommonNonHelperSymbol enumeration %d. contiguousArraySizeSymbol %d, discontiguousArraySizeSymbol %d, arrayClassRomPtrSymbol %d, javaLangClassFromClassSymbol %d, classFromJavaLangClassSymbol %d",
+                 sizeof(_commonNonHelperSymbolNames)/sizeof(_commonNonHelperSymbolNames[0]),
+                 static_cast<int32_t>(OMRlastPrintableCommonNonhelperSymbol - OMRfirstPrintableCommonNonhelperSymbol + 1),
+                 (int32_t)contiguousArraySizeSymbol,
+                 (int32_t)discontiguousArraySizeSymbol,
+                 (int32_t)arrayClassRomPtrSymbol,
+                 (int32_t)javaLangClassFromClassSymbol,
+                 (int32_t)classFromJavaLangClassSymbol);
+#endif
+#if 1
    static_assert(sizeof(_commonNonHelperSymbolNames)/sizeof(_commonNonHelperSymbolNames[0]) ==
                  static_cast<int32_t>(OMRlastPrintableCommonNonhelperSymbol - OMRfirstPrintableCommonNonhelperSymbol + 1),
                  "_commonNonHelperSymbolNames array must match CommonNonHelperSymbol enumeration");

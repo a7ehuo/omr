@@ -226,6 +226,7 @@ class SymbolReferenceTable
        */
       objectInequalityComparisonSymbol,
 
+      objectInequalityInlineComparisonSymbol,
       /**
        * \brief Tests, in some consumer-specific way, whether the array operand has a component type that
        * is a non-nullable class, and if so, performs a NULLCHK on the value that needs to be assigned to
