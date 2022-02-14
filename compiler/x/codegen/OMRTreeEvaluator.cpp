@@ -1190,6 +1190,8 @@ TR::Register *OMR::X86::TreeEvaluator::SSE2ArraycmpEvaluator(TR::Node *node, TR:
    generateLabelInstruction(TR::InstOpCode::label, node, startLabel, cg);
    generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, deltaReg, s1Reg, cg);
    generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, deltaReg, s2Reg, cg); // delta = s1 - s2
+   //TODO: why doesn't it compare if delta is 0, which means s1 and s2 points to the same address
+   generateLabelInstruction(TR::InstOpCode::JE4, node, equalLabel, cg);
    generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, qwordCounterReg, strLenReg, cg);
    generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, qwordCounterReg, 4, cg);
    generateLabelInstruction(TR::InstOpCode::JE4,node, byteStart, cg);
@@ -1322,26 +1324,27 @@ TR::Register *OMR::X86::TreeEvaluator::SSE2ArraycmpLenEvaluator(TR::Node *node, 
    generateLabelInstruction(TR::InstOpCode::JE4,node, byteStart, cg);
 
    generateLabelInstruction(TR::InstOpCode::label, node, qwordLoop, cg);
-   generateRegMemInstruction(TR::InstOpCode::MOVUPSRegMem, node, xmm1Reg, generateX86MemoryReference(s1Reg, resultReg, 0, cg), cg);
+   generateRegMemInstruction(TR::InstOpCode::MOVUPSRegMem, node, xmm1Reg, generateX86MemoryReference(s1Reg, resultReg, 0, cg), cg); //Moves 128 bits (16 byte)
    generateRegMemInstruction(TR::InstOpCode::MOVUPSRegMem, node, xmm2Reg, generateX86MemoryReference(s2Reg, resultReg, 0, cg), cg);
-   generateRegRegInstruction(TR::InstOpCode::PCMPEQBRegReg, node, xmm1Reg, xmm2Reg, cg);
-   generateRegRegInstruction(TR::InstOpCode::PMOVMSKB4RegReg, node, equalTestReg, xmm1Reg, cg);
+   generateRegRegInstruction(TR::InstOpCode::PCMPEQBRegReg, node, xmm1Reg, xmm2Reg, cg); // Compare packed bytes in xmm2/m128 and xmm1 for equality. Compares the corresponding bytes in the destination and source operands. If a pair of data elements is equal, the corresponding data element in the destination operand is set to all 1s; otherwise, it is set to all 0s.
+   generateRegRegInstruction(TR::InstOpCode::PMOVMSKB4RegReg, node, equalTestReg, xmm1Reg, cg); // Move a byte mask of xmm to reg. If not equal, equalTestReg is all 0s.  Creates a mask made up of the most significant bit of each byte of the source operand (second operand) and stores the result in the low byte or word of the destination operand (first operand). 16 bits for 128-bit source operand
    generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, equalTestReg, 0xffff, cg);
 
    cg->stopUsingRegister(xmm1Reg);
    cg->stopUsingRegister(xmm2Reg);
 
-   generateLabelInstruction(TR::InstOpCode::JNE4, node, qwordUnequal, cg);
-   generateRegImmInstruction(TR::InstOpCode::ADDRegImm4(), node, resultReg, 16, cg);
-   generateRegImmInstruction(TR::InstOpCode::SUBRegImm4(), node, qwordCounterReg, 1, cg);
+   generateLabelInstruction(TR::InstOpCode::JNE4, node, qwordUnequal, cg); // if not equal
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImm4(), node, resultReg, 16, cg); // if equal, index + 16 (resultReg),
+   generateRegImmInstruction(TR::InstOpCode::SUBRegImm4(), node, qwordCounterReg, 1, cg); // if equal, totalNumberOfDoubleQuadWord += 1 (qwordCounterReg),
    generateLabelInstruction(TR::InstOpCode::JG4, node, qwordLoop, cg);
 
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, byteStart, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, byteStart, cg); // all DQword equal, jump to byte comparison
 
-   generateLabelInstruction(TR::InstOpCode::label, node, qwordUnequal, cg);
-   generateRegInstruction(TR::InstOpCode::NOT2Reg, node, equalTestReg, cg);
-   generateRegRegInstruction(TR::InstOpCode::BSF2RegReg, node, equalTestReg, equalTestReg, cg);
-   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, resultReg, equalTestReg, cg);
+   // TODO: Why?
+   generateLabelInstruction(TR::InstOpCode::label, node, qwordUnequal, cg);  // if not equal
+   generateRegInstruction(TR::InstOpCode::NOT2Reg, node, equalTestReg, cg); // equalTestReg 0x0000 -> 0xffff
+   generateRegRegInstruction(TR::InstOpCode::BSF2RegReg, node, equalTestReg, equalTestReg, cg); // Sets ZF if a bit is found set and loads the destination with an index to first set bit. Clears ZF is no bits are found set.
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, resultReg, equalTestReg, cg); // resultReg + a mask that's made of most of significant bit of double quad word?
    generateLabelInstruction(TR::InstOpCode::JMP4, node, doneLabel, cg);
 
    cg->stopUsingRegister(qwordCounterReg);
