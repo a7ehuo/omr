@@ -2155,6 +2155,7 @@ TR::X86DataSnippet * OMR::X86::CodeGenerator::createDataSnippet(TR::Node * n, vo
 
 TR::X86ConstantDataSnippet * OMR::X86::CodeGenerator::findOrCreateConstantDataSnippet(TR::Node * n, void * c, size_t s)
    {
+   bool trace = self()->comp()->getOption(TR_TraceCG);
    // A simple linear search should suffice for now since the number of data constants
    // produced is typically very small.  Eventually, this should be implemented as an
    // ordered list or a hash table.
@@ -2165,6 +2166,10 @@ TR::X86ConstantDataSnippet * OMR::X86::CodeGenerator::findOrCreateConstantDataSn
          {
          if (!memcmp((*iterator)->getRawData(), c, s))
             {
+            if (trace)
+               {
+               traceMsg(self()->comp(), "%s: found X86ConstantDataSnippet %p\n", __FUNCTION__, *iterator);
+               }
             return (TR::X86ConstantDataSnippet*)(*iterator);
             }
          }
@@ -2174,6 +2179,11 @@ TR::X86ConstantDataSnippet * OMR::X86::CodeGenerator::findOrCreateConstantDataSn
    //
    auto snippet = new (self()->trHeapMemory()) TR::X86ConstantDataSnippet(self(), n, c, s);
    _dataSnippetList.push_back(snippet);
+
+  if (trace)
+     {
+     traceMsg(self()->comp(), "%s: create X86ConstantDataSnippet %p\n", __FUNCTION__, snippet);
+     }
    return snippet;
    }
 

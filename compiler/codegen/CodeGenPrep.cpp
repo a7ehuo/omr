@@ -142,6 +142,48 @@
  * @param node the node being lowered
  * @param tt the TreeTop anchoring the node
  */
+static bool
+shouldLowerNewValue(TR::Compilation *comp, TR::Node *newValueNode)
+   {
+   if (comp->getOption(TR_TraceCG))
+      traceMsg(comp, "newvalue n%dn isNonZero %d isZero %d\n", newValueNode->getGlobalIndex(), newValueNode->isNonZero(), newValueNode->isZero());
+
+   static bool disableDefaultValueConstantDataSnippet = feGetEnv("TR_DisableDefaultValueConstantDataSnippet");
+
+   if (disableDefaultValueConstantDataSnippet || !newValueNode->markedAllocationCanBeRemoved())
+      {
+      if (comp->getOption(TR_TraceCG))
+         traceMsg(comp, "n%dn shouldLowerNewValue 1 disableDefaultValueConstantDataSnippet %d markedAllocationCanBeRemoved %d\n",
+             newValueNode->getGlobalIndex(), disableDefaultValueConstantDataSnippet, newValueNode->markedAllocationCanBeRemoved());
+
+      return true;
+      }
+
+   // If store zero to all fields, we don't need to lower newvalue.
+   // The newvalue instance will be allocated at constant data snippet
+   bool storeZeroToAllFields = true;
+
+   // Skip loadaddr
+   for (int32_t i = 1; i < newValueNode->getNumChildren(); i++)
+      {
+      TR::Node *child = newValueNode->getChild(i);
+
+      if (comp->getOption(TR_TraceCG))
+         traceMsg(comp, "child n%dn isNonZero %d isZero %d\n", child->getGlobalIndex(), child->isNonZero(), child->isZero());
+
+      if (!child->isZero())
+         {
+         storeZeroToAllFields = false;
+         break;
+         }
+      }
+
+   if (comp->getOption(TR_TraceCG))
+      traceMsg(comp, "n%dn shouldLowerNewValue %d storeZeroToAllFields %d\n", newValueNode->getGlobalIndex(), !storeZeroToAllFields, storeZeroToAllFields);
+
+   return !storeZeroToAllFields;
+   }
+
 static void
 lowerNewValue(TR::Compilation *comp, TR::Node *node, TR::TreeTop *tt)
    {
@@ -308,7 +350,8 @@ OMR::CodeGenerator::lowerTreesPreChildrenVisit(TR::Node * parent, TR::TreeTop * 
       }
    else if (parent->getOpCodeValue() == TR::newvalue)
       {
-      lowerNewValue(self()->comp(), parent, treeTop);
+      if (shouldLowerNewValue(self()->comp(), parent))
+         lowerNewValue(self()->comp(), parent, treeTop);
       }
    }
 
