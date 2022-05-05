@@ -4264,6 +4264,10 @@ TR::Node *constrainNewvalue(OMR::ValuePropagation *vp, TR::Node *node)
    {
    constrainChildren(vp, node);
 
+   static const char *disableConstrainNewvalue = feGetEnv("TR_DisableConstrainNewvalue");
+   if (disableConstrainNewvalue)
+      return node;
+
    vp->createExceptionEdgeConstraints(TR::Block::CanCatchNewvalue, NULL, node);
 
    bool trace = vp->trace();

@@ -1191,7 +1191,9 @@ TR::Register *OMR::X86::TreeEvaluator::SSE2ArraycmpEvaluator(TR::Node *node, TR:
    generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, deltaReg, s1Reg, cg);
    generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, deltaReg, s2Reg, cg); // delta = s1 - s2
    // If s1 and s2 are the same address, jump to equalLabel
-   generateLabelInstruction(TR::InstOpCode::JE4, node, equalLabel, cg);
+   static const char *disableX86AlwaysEqArrayCmpJmp = feGetEnv("TR_DisableX86AlwaysEqArrayCmpJmp");
+   if (!disableX86AlwaysEqArrayCmpJmp)
+      generateLabelInstruction(TR::InstOpCode::JE4, node, equalLabel, cg);
    generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, qwordCounterReg, strLenReg, cg);
    generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, qwordCounterReg, 4, cg);
    generateLabelInstruction(TR::InstOpCode::JE4,node, byteStart, cg);
