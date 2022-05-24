@@ -476,7 +476,9 @@ class SymbolReferenceTable
        */
       J9JNIMethodIDvTableIndexFieldSymbol,
 
-      OMRlastPrintableCommonNonhelperSymbol = J9JNIMethodIDvTableIndexFieldSymbol,
+      defaultValueSymbol,
+
+      OMRlastPrintableCommonNonhelperSymbol = defaultValueSymbol,
 
       firstPerCodeCacheHelperSymbol,
       lastPerCodeCacheHelperSymbol = firstPerCodeCacheHelperSymbol + TR_numCCPreLoadedCode - 1,
