@@ -6683,7 +6683,7 @@ OMR::Node::canChkNodeCreatedByPRE()
 bool
 OMR::Node::isNodeCreatedByPRE()
    {
-   /* TR_ASSERT(self()->canChkNodeCreatedByPRE(), "Unexpected opcode %s in isNodeCreatedByPRE()",self()->getOpCode().getName()); */
+   TR_ASSERT(self()->canChkNodeCreatedByPRE(), "Unexpected opcode %s in isNodeCreatedByPRE()",self()->getOpCode().getName());
    return _flags.testAny(nodeCreatedByPRE);
    }
 
