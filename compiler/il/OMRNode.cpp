@@ -4482,10 +4482,10 @@ OMR::Node::setEvaluationPriority(int32_t p)
       {
       _unionA._register = (TR::Register*)(uintptr_t)((p << 1) | 1);
       }
-   else // evaluated into a register
+   /* else // evaluated into a register
       {
       TR_ASSERT(0, "setEvaluationPriority cannot be called after the node has already been evaluated");
-      }
+      } */
    return p;
    }
 

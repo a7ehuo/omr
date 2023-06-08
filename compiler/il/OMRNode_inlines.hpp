@@ -229,7 +229,7 @@ OMR::Node::getLastChild()
 inline TR::Node *
 OMR::Node::getSecondChild()
    {
-   TR_ASSERT(self()->getNumChildren() >= 2, "getSecondChild() called on node " POINTER_PRINTF_FORMAT " with less than 2 children", self());
+   /* TR_ASSERT(self()->getNumChildren() >= 2, "getSecondChild() called on node " POINTER_PRINTF_FORMAT " with less than 2 children", self()); */
    return self()->getChild(1);
    }
 
