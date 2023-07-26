@@ -2572,11 +2572,7 @@ OMR::Options::jitPreProcess()
    self()->setOption(TR_DisableIntrinsics);
 #endif
 
-#if defined(DEBUG) || defined(PROD_WITH_ASSUMES)
-   bool forceSuffixLogs = false;
-#else
    bool forceSuffixLogs = true;
-#endif
 
    if (forceSuffixLogs)
       self()->setOption(TR_EnablePIDExtension);
