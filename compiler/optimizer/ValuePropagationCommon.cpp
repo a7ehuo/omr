@@ -1549,6 +1549,10 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 
       bool canSkipAllChecksOnArrayCopy = methodSymbol->safeToSkipChecksOnArrayCopies() || isRecognizedMultiLeafArrayCopy || isStringCompressedArrayCopy || isStringDecompressedArrayCopy;
 
+      static char *disableAllChecksOnArrayCopy = feGetEnv("TR_DisableAllChecksOnArrayCopy");
+      if (disableAllChecksOnArrayCopy)
+        canSkipAllChecksOnArrayCopy = true;
+
       if (!canSkipAllChecksOnArrayCopy)
          {
          canSkipAllChecksOnArrayCopy = node->isNodeRecognizedArrayCopyCall();
