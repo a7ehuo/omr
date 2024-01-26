@@ -1729,14 +1729,269 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
    mainBegLabel->setStartInternalControlFlow();
    mainEndLabel->setEndInternalControlFlow();
 
+   TR::Compilation *comp = cg->comp();
+   bool trace = comp->getOption(TR_TraceCG);
+   const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitive";
+   if (trace)
+      traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
+         node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
+
    generateLabelInstruction(TR::InstOpCode::label, node, mainBegLabel, cg);
    if (node->isForwardArrayCopy())
       {
-      generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-      generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
-      generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-      generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-      generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+      static bool debugNotUseRepMovsd = feGetEnv("TR_DebugNotUseRepMovsd") != NULL;
+
+      if (debugNotUseRepMovsd)
+         {
+         /*
+          Test:
+            2
+            4
+            8
+            4+2
+            8+2
+            8+4
+            8+4+2
+            8*2+2
+            8*2+4
+            8*2+4+2
+            8*2+4*2+2
+
+          if size <= 32 bytes -> jmp -> copy
+          rep movsd
+          jmp -> mainEndLabel
+
+          copy:
+             remainingSize = size;
+             size = size >> 3;
+             jz copy_dword;
+
+          copy_qword:
+             remainingSize = remainingSize - (size << 3)
+          copy_qword_loop:
+             copy quadword from the source to the destination
+             source = source + 8;
+             destination = destination + 8;
+             size = size - 1;
+             jne copy_qword_loop
+
+          copy_dword:
+             size = remainingSize >> 2;
+             jz copy_word;
+             remainingSize = remainingSize - (size << 2)
+          copy_dword_loop:
+             copy doubleword from the source to the destination
+             source = source + 4;
+             destination = destination + 4;
+             size = size - 1;
+             jne copy_dword_loop
+
+          copy_word:
+             size = remainingSize >> 1;
+             jz mainEndLabel
+             copy word from the source to the destination
+
+         mainEndLabel:
+         */
+
+         int32_t REP_MOVS_THRESHOLD = 32; // 32 bytes
+         TR::LabelSymbol* copyLabel = generateLabelSymbol(cg);
+
+         /*
+          if size <= 32 bytes -> jmp -> copy
+          rep movsd
+          jmp -> mainEndLabel
+          */
+         generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, sizeReg, REP_MOVS_THRESHOLD, cg);
+         generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLabel, cg);
+
+         // Do rep movsd if size > 32 bytes
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+         generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+         //TR::LabelSymbol* copyQwordLabel = generateLabelSymbol(cg);
+         TR::LabelSymbol* copyQwordLoopLabel = generateLabelSymbol(cg);
+         TR::LabelSymbol* copyDwordLabel = generateLabelSymbol(cg);
+         TR::LabelSymbol* copyDwordLoopLabel = generateLabelSymbol(cg);
+         TR::LabelSymbol* copyWordLabel = generateLabelSymbol(cg);
+
+         TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
+         TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
+
+         /*
+          copy:
+             remainingSize = size;
+             size = size >> 3;
+             jz copy_dword;
+          */
+         generateLabelInstruction(TR::InstOpCode::label, node, copyLabel, cg);
+
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
+
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 3, cg);
+         generateLabelInstruction(TR::InstOpCode::JE4, node, copyDwordLabel, cg);
+
+         /*
+          copy_qword:
+             remainingSize = remainingSize - (size << 3)
+          copy_qword_loop:
+             copy quadword from the source to the destination
+             source = source + 8;
+             destination = destination + 8;
+             size = size - 1;
+             jne copy_qword_loop
+          */
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg, sizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 3, cg);
+         generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
+
+         generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
+         generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 8, cg);
+         generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 8, cg);
+         generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
+         generateLabelInstruction(TR::InstOpCode::JNE4, node, copyQwordLoopLabel, cg);
+
+         /*
+          copy_dword:
+             size = remainingSize >> 2;
+             jz copy_word;
+             remainingSize = remainingSize - (size << 2)
+          copy_dword_loop:
+             copy doubleword from the source to the destination
+             source = source + 4;
+             destination = destination + 4;
+             size = size - 1;
+             jne copy_dword_loop
+          */
+         generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLabel, cg);
+
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, sizeReg, remainingSizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+         generateLabelInstruction(TR::InstOpCode::JE4, node, copyWordLabel, cg);
+
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg, sizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 2, cg);
+         generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
+
+         generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
+         generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 4, cg);
+         generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 4, cg);
+         generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
+         generateLabelInstruction(TR::InstOpCode::JNE4, node, copyDwordLoopLabel, cg);
+
+         /*
+          copy_word:
+             size = remainingSize >> 1;
+             jz mainEndLabel
+             copy word from the source to the destination
+          */
+         generateLabelInstruction(TR::InstOpCode::label, node, copyWordLabel, cg);
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, sizeReg, remainingSizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 1, cg);
+         generateLabelInstruction(TR::InstOpCode::JE4, node, mainEndLabel, cg);
+
+         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+
+         cg->stopUsingRegister(remainingSizeReg);
+         cg->stopUsingRegister(tmpReg);
+         }
+#if 0
+      if (debugNotUseRepMovsd)
+         {
+         /*
+         char array, elementSize = 2 bytes = 16 bits
+         each move is one element 2 bytes
+
+         sizeReg = 12/4 = sizeReg >> 2 = 3
+         loopBegLabel:
+         src -> temp -> dst
+         src = src + 1
+         dst = dst + 1
+         size = size - 1
+         if size!=0, jmp to mainBegLabel
+         */
+
+         /*
+          mainBegLabel:
+          if length <= 32 Bytes: jmp -> copyLoopLabel
+          rep movsd
+          jmp -> mainEndLabel
+          copyLoopLabel:
+             loopBegLabel:
+          mainEndLabel:
+          */
+         int32_t REP_MOVS_THRESHOLD = 32; // 32 bytes
+         TR::LabelSymbol* copyLoopLabel = generateLabelSymbol(cg);
+
+         // length < 16 (32 bytes)?
+         generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, sizeReg, REP_MOVS_THRESHOLD, cg);
+         generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLoopLabel, cg);
+         //generateLabelInstruction(TR::InstOpCode::JG4, node, repMovsdLabel, cg);
+
+         // Do rep movsd if length > 16 (32 bytes)
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+         generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+         // Do copy loop if length <= 16 (32 bytes)
+         generateLabelInstruction(TR::InstOpCode::label, node, copyLoopLabel, cg);
+
+         TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
+
+         static bool debugMoveDword = feGetEnv("TR_DebugMoveDword") != NULL;
+
+         if (debugMoveDword)
+            {
+            generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+            }
+
+         TR::LabelSymbol *loopBegLabel = generateLabelSymbol(cg);
+         generateLabelInstruction(TR::InstOpCode::label, node, loopBegLabel, cg);
+
+         if (debugMoveDword) // Each time move 4 bytes: 2 elements
+            {
+            generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+            generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+
+            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 4, cg);
+            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 4, cg);
+            }
+         else // Each time move one element: 2 bytes
+            {
+            generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+            generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+
+            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 2, cg);
+            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 2, cg);
+            }
+
+         generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
+
+         generateLabelInstruction(TR::InstOpCode::JNE4, node, loopBegLabel, cg);
+
+         cg->stopUsingRegister(tmpReg);
+         }
+#endif
+      else
+         {
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+         }
       }
    else // decide direction during runtime
       {
@@ -2191,6 +2446,10 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
    TR::Node* dstNode  = node->getChild(1); // the address of memory to copy to
    TR::Node* sizeNode = node->getChild(2); // the size of memory to copy, in bytes
 
+   TR::Compilation *comp = cg->comp();
+   bool trace = comp->getOption(TR_TraceCG);
+   const char *funcName = "OMR::X86::TreeEvaluator::arraycopyEvaluator";
+
    TR::Register* srcReg = cg->gprClobberEvaluate(srcNode, TR::InstOpCode::MOVRegReg());
    TR::Register* dstReg = cg->gprClobberEvaluate(dstNode, TR::InstOpCode::MOVRegReg());
 
@@ -2205,6 +2464,11 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
       else
          elementSize = TR::Symbol::convertTypeToSize(dt);
       }
+
+   if (trace)
+      traceMsg(comp, "%s: node n%dn srcNode n%dn srcReg %s dstNode n%dn dstReg %s sizeNode n%dn elementSize %d\n", funcName,
+         node->getGlobalIndex(), srcNode->getGlobalIndex(), comp->getDebug()->getName(srcReg),
+         dstNode->getGlobalIndex(), comp->getDebug()->getName(dstReg), sizeNode->getGlobalIndex(), elementSize);
 
    static bool optimizeForConstantLengthArrayCopy = feGetEnv("TR_OptimizeForConstantLengthArrayCopy") != NULL;
    static bool ignoreDirectionForConstantLengthArrayCopy = feGetEnv("TR_IgnoreDirectionForConstantLengthArrayCopy") != NULL;
@@ -2226,6 +2490,12 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
          }
       }
 
+   if (trace)
+      traceMsg(comp, "%s: size %u useREPMOVSW %d forceByteArrayElementCopy %d optimizeForConstantLengthArrayCopy %d ignoreDirectionForConstantLengthArrayCopy %d isShortConstArrayWithDirection %d isShortConstArrayWithoutDirection %d isForwardArrayCopy %d isBackwardArrayCopy %d\n", funcName,
+         size, useREPMOVSW, forceByteArrayElementCopy, optimizeForConstantLengthArrayCopy,
+         ignoreDirectionForConstantLengthArrayCopy, isShortConstArrayWithDirection, isShortConstArrayWithoutDirection,
+         node->isForwardArrayCopy(), node->isBackwardArrayCopy());
+
    if (isShortConstArrayWithDirection)
       {
       arraycopyForShortConstArrayWithDirection(node, dstReg, srcReg, size, cg);
@@ -2243,17 +2513,21 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
       if (cg->comp()->target().is64Bit() && !isSize64Bit)
          {
          generateRegRegInstruction(TR::InstOpCode::MOVZXReg8Reg4, node, sizeReg, sizeReg, cg);
+         if (trace) traceMsg(comp, "%s: generateRegRegInstruction TR::InstOpCode::MOVZXReg8Reg4\n", funcName);
          }
       if (elementSize == 8 && cg->comp()->target().is32Bit())
          {
+         if (trace) traceMsg(comp, "%s: calling arrayCopy64BitPrimitiveOnIA32\n", funcName);
          arrayCopy64BitPrimitiveOnIA32(node, dstReg, srcReg, sizeReg, cg);
          }
       else if (elementSize == 2 && !useREPMOVSW)
          {
+         if (trace) traceMsg(comp, "%s: calling arrayCopy16BitPrimitive\n", funcName);
          arrayCopy16BitPrimitive(node, dstReg, srcReg, sizeReg, cg);
          }
       else
          {
+         if (trace) traceMsg(comp, "%s: calling arrayCopyDefault\n", funcName);
          arrayCopyDefault(node, elementSize, dstReg, srcReg, sizeReg, cg);
          }
       cg->stopUsingRegister(sizeReg);
