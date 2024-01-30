@@ -1741,26 +1741,16 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
       {
       static bool debugNotUseRepMovsd = feGetEnv("TR_DebugNotUseRepMovsd") != NULL;
 
-      if (debugNotUseRepMovsd)
+      if (debugNotUseRepMovsd && cg->comp()->target().is64Bit())
          {
          /*
-          Test:
-            2
-            4
-            8
-            4+2
-            8+2
-            8+4
-            8+4+2
-            8*2+2
-            8*2+4
-            8*2+4+2
-            8*2+4*2+2
+          if size <= REP_MOVS_THRESHOLD_BYTES -> jmp -> copy (path_2)
 
-          if size <= 32 bytes -> jmp -> copy
-          rep movsd
-          jmp -> mainEndLabel
+          // path_1
+          rep movsq
+          jmp copy_dword
 
+          // path_2
           copy:
              remainingSize = size;
              size = size >> 3;
@@ -1775,52 +1765,57 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
              size = size - 1;
              jne copy_qword_loop
 
-          copy_dword:
-             size = remainingSize >> 2;
-             jz copy_word;
-             remainingSize = remainingSize - (size << 2)
-          copy_dword_loop:
+          copy_dword: // remaining size: 0, 6, 4, 2
+             size = remainingSize >> 2
+             jz copy_word; // remaining size: 0 or 2
+
+             remainingSize = remainingSize - 4  // remaining size: 2, 0
              copy doubleword from the source to the destination
              source = source + 4;
              destination = destination + 4;
-             size = size - 1;
-             jne copy_dword_loop
 
-          copy_word:
+          copy_word: // remaining size: 0 or 2
              size = remainingSize >> 1;
              jz mainEndLabel
              copy word from the source to the destination
 
-         mainEndLabel:
+          mainEndLabel:
          */
 
-         int32_t REP_MOVS_THRESHOLD = 32; // 32 bytes
+         int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
          TR::LabelSymbol* copyLabel = generateLabelSymbol(cg);
-
-         /*
-          if size <= 32 bytes -> jmp -> copy
-          rep movsd
-          jmp -> mainEndLabel
-          */
-         generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, sizeReg, REP_MOVS_THRESHOLD, cg);
-         generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLabel, cg);
-
-         // Do rep movsd if size > 32 bytes
-         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
-         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
-         generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
-
-         //TR::LabelSymbol* copyQwordLabel = generateLabelSymbol(cg);
          TR::LabelSymbol* copyQwordLoopLabel = generateLabelSymbol(cg);
          TR::LabelSymbol* copyDwordLabel = generateLabelSymbol(cg);
-         TR::LabelSymbol* copyDwordLoopLabel = generateLabelSymbol(cg);
          TR::LabelSymbol* copyWordLabel = generateLabelSymbol(cg);
 
          TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
          TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
+
+         /*
+          if size <= REP_MOVS_THRESHOLD_BYTES -> jmp -> copy
+          rep movsq
+          if remainder is 0 -> mainEndLabel
+          else -> copy_dword_2
+          */
+         generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
+         generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLabel, cg);
+
+         // ---------------------------------
+         // Path 1: Do rep movsq if size > REP_MOVS_THRESHOLD_BYTES
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 3, cg);
+
+         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg, sizeReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 3, cg);
+         generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
+
+         generateInstruction(TR::InstOpCode::REPMOVSQ, node, cg);
+         //generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+         generateLabelInstruction(TR::InstOpCode::JMP4, node, copyDwordLabel, cg);
+
+         // ---------------------------------
+         // Path 2: Copy qwords in a loop if size <= REP_MOVS_THRESHOLD_BYTES
 
          /*
           copy:
@@ -1829,9 +1824,7 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
              jz copy_dword;
           */
          generateLabelInstruction(TR::InstOpCode::label, node, copyLabel, cg);
-
          generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
-
          generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 3, cg);
          generateLabelInstruction(TR::InstOpCode::JE4, node, copyDwordLabel, cg);
 
@@ -1857,38 +1850,32 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
          generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
          generateLabelInstruction(TR::InstOpCode::JNE4, node, copyQwordLoopLabel, cg);
 
+         // ---------------------------------
+         // Process remainder
          /*
-          copy_dword:
-             size = remainingSize >> 2;
-             jz copy_word;
-             remainingSize = remainingSize - (size << 2)
-          copy_dword_loop:
+          copy_dword: // remaining size: 0, 6, 4, 2
+             size = remainingSize >> 2
+             jz copy_word; // remaining size: 0 or 2
+
+             remainingSize = remainingSize - 4  // remaining size: 2, 0
              copy doubleword from the source to the destination
              source = source + 4;
              destination = destination + 4;
-             size = size - 1;
-             jne copy_dword_loop
           */
          generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLabel, cg);
-
          generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, sizeReg, remainingSizeReg, cg);
          generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
          generateLabelInstruction(TR::InstOpCode::JE4, node, copyWordLabel, cg);
 
-         generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg, sizeReg, cg);
-         generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 2, cg);
-         generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
+         generateRegImmInstruction(TR::InstOpCode::SUB4RegImms, node, remainingSizeReg, 4, cg);
 
-         generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
          generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
          generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
          generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 4, cg);
          generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 4, cg);
-         generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
-         generateLabelInstruction(TR::InstOpCode::JNE4, node, copyDwordLoopLabel, cg);
 
          /*
-          copy_word:
+          copy_word: // remaining size: 0 or 2
              size = remainingSize >> 1;
              jz mainEndLabel
              copy word from the source to the destination
@@ -1904,86 +1891,6 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
          cg->stopUsingRegister(remainingSizeReg);
          cg->stopUsingRegister(tmpReg);
          }
-#if 0
-      if (debugNotUseRepMovsd)
-         {
-         /*
-         char array, elementSize = 2 bytes = 16 bits
-         each move is one element 2 bytes
-
-         sizeReg = 12/4 = sizeReg >> 2 = 3
-         loopBegLabel:
-         src -> temp -> dst
-         src = src + 1
-         dst = dst + 1
-         size = size - 1
-         if size!=0, jmp to mainBegLabel
-         */
-
-         /*
-          mainBegLabel:
-          if length <= 32 Bytes: jmp -> copyLoopLabel
-          rep movsd
-          jmp -> mainEndLabel
-          copyLoopLabel:
-             loopBegLabel:
-          mainEndLabel:
-          */
-         int32_t REP_MOVS_THRESHOLD = 32; // 32 bytes
-         TR::LabelSymbol* copyLoopLabel = generateLabelSymbol(cg);
-
-         // length < 16 (32 bytes)?
-         generateRegImmInstruction(TR::InstOpCode::CMP4RegImm4, node, sizeReg, REP_MOVS_THRESHOLD, cg);
-         generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLoopLabel, cg);
-         //generateLabelInstruction(TR::InstOpCode::JG4, node, repMovsdLabel, cg);
-
-         // Do rep movsd if length > 16 (32 bytes)
-         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
-         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
-         generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
-
-         // Do copy loop if length <= 16 (32 bytes)
-         generateLabelInstruction(TR::InstOpCode::label, node, copyLoopLabel, cg);
-
-         TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
-
-         static bool debugMoveDword = feGetEnv("TR_DebugMoveDword") != NULL;
-
-         if (debugMoveDword)
-            {
-            generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-            }
-
-         TR::LabelSymbol *loopBegLabel = generateLabelSymbol(cg);
-         generateLabelInstruction(TR::InstOpCode::label, node, loopBegLabel, cg);
-
-         if (debugMoveDword) // Each time move 4 bytes: 2 elements
-            {
-            generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-            generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
-
-            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 4, cg);
-            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 4, cg);
-            }
-         else // Each time move one element: 2 bytes
-            {
-            generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-            generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
-
-            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 2, cg);
-            generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, dstReg, 2, cg);
-            }
-
-         generateRegImmInstruction(TR::InstOpCode::SUB1RegImm1, node, sizeReg, 1, cg);
-
-         generateLabelInstruction(TR::InstOpCode::JNE4, node, loopBegLabel, cg);
-
-         cg->stopUsingRegister(tmpReg);
-         }
-#endif
       else
          {
          generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
