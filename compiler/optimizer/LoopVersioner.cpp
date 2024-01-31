@@ -4734,10 +4734,16 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       if (actualComparisonNode->getOpCode().isStore())
          {
          // No critical edge splitting necessary.
+         if (trace())
+            traceMsg(comp(), "%s: actualComparisonNode %p n%dn comparisonBlock block_%d. isStore: No critical edge splitting necessary \n", __FUNCTION__, actualComparisonNode, actualComparisonNode->getGlobalIndex(), comparisonBlock->getNumber());
          }
       else if (firstComparisonNode)
          {
          firstComparisonNode = false;
+
+         if (trace())
+            traceMsg(comp(), "%s: actualComparisonNode %p n%dn comparisonBlock block_%d. firstComparisonNode true -> false \n", __FUNCTION__, actualComparisonNode, actualComparisonNode->getGlobalIndex(), comparisonBlock->getNumber());
+
          //////TR::Node::recreate(actualComparisonNode, actualComparisonNode->getOpCode().getOpCodeForReverseBranch());
          //////actualComparisonNode->setBranchDestination(invariantBlock->getEntry());
          //////lastComparisonBlock = comparisonBlock;
@@ -4749,7 +4755,8 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          _cfg->addNode(newGotoBlock);
 
          if (trace())
-            traceMsg(comp(), "Creating new goto block : %d for node %p\n", newGotoBlock->getNumber(), actualComparisonNode);
+            traceMsg(comp(), "%s: actualComparisonNode %p n%dn comparisonBlock block_%d. Creating new goto block_%d \n", __FUNCTION__, actualComparisonNode,
+                actualComparisonNode->getGlobalIndex(), comparisonBlock->getNumber(), newGotoBlock->getNumber());
 
          actualComparisonNode->setBranchDestination(newGotoBlock->getEntry());
          TR::TreeTop *gotoBlockEntryTree = newGotoBlock->getEntry();
@@ -4765,6 +4772,11 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          //_cfg->addEdge(TR::CFGEdge::createEdge(newGotoBlock,  clonedLoopInvariantBlock, trMemory()));
          TR_BlockStructure *newGotoBlockStructure = new (_cfg->structureMemoryRegion()) TR_BlockStructure(comp(), newGotoBlock->getNumber(), newGotoBlock);
          newGotoBlockStructure->setCreatedByVersioning(true);
+
+         if (trace())
+            traceMsg(comp(), "%s: gotoNode %p n%dn newGotoBlockStructure %p %d clonedLoopInvariantBlock %p block_%d\n", __FUNCTION__,
+               gotoNode, gotoNode->getGlobalIndex(), newGotoBlockStructure, newGotoBlockStructure->getNumber(), clonedLoopInvariantBlock, clonedLoopInvariantBlock->getNumber());
+
          if (!_neitherLoopCold)
             {
             newGotoBlock->setIsCold();
@@ -4801,10 +4813,18 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       else
          comp()->setStartTree(comparisonEntryTree);
 
+      if (trace())
+         traceMsg(comp(), "%s: comparisonTree n%dn treeBeforeInsertionPoint %p n%dn comparisonEntryTree n%dn comparisonExitTree n%dn insertionPoint n%dn\n", __FUNCTION__,
+            comparisonTree->getNode()->getGlobalIndex(), treeBeforeInsertionPoint, treeBeforeInsertionPoint ? treeBeforeInsertionPoint->getNode()->getGlobalIndex() : -1,
+            comparisonEntryTree->getNode()->getGlobalIndex(), comparisonExitTree->getNode()->getGlobalIndex(), insertionPoint->getNode()->getGlobalIndex());
+
       chooserBlock = comparisonBlock;
       comparisonBlocks.add(comparisonBlock);
       insertionPoint = comparisonEntryTree;
       comparisonNode = comparisonNode->getNextElement();
+
+      if (trace())
+         traceMsg(comp(), "%s: chooserBlock block_%d insertionPoint n%dn\n", __FUNCTION__, chooserBlock->getNumber(), insertionPoint->getNode()->getGlobalIndex());
       }
 
 
@@ -4816,8 +4836,14 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       {
       TR::CFGEdge * const nextPred = invariantBlock->getPredecessors().front();
       invariantBlock->getPredecessors().pop_front();
+
+      if (trace())
+         traceMsg(comp(), "%s: invariantBlock nextPred block_%d -> block_%d change To block_%d\n", __FUNCTION__, nextPred->getFrom()->getNumber(), nextPred->getTo()->getNumber(), chooserBlock->getNumber());
       nextPred->setTo(chooserBlock);
       TR::Block * const nextPredBlock = toBlock(nextPred->getFrom());
+
+      if (trace())
+         traceMsg(comp(), "%s: invariantBlock nextPredBlock block_%d \n", __FUNCTION__, nextPredBlock->getNumber());
       if (nextPredBlock != _cfg->getStart())
          {
          TR::TreeTop *lastTreeInPred = nextPredBlock->getLastRealTreeTop();
@@ -4839,6 +4865,10 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
    clonedInvariantExitTree->join(nextTreeAfterLastComparisonExit);
    TR::TreeTop *previousTree = lastComparisonExit->getPrevRealTreeTop();
 
+   if (trace())
+      traceMsg(comp(), "%s: lastComparisonExit n%dn nextTreeAfterLastComparisonExit n%dn previousTree n%dn\n", __FUNCTION__, lastComparisonExit->getNode()->getGlobalIndex(),
+         nextTreeAfterLastComparisonExit->getNode()->getGlobalIndex(), previousTree->getNode()->getGlobalIndex());
+
    if (previousTree->getNode()->getOpCodeValue() != TR::Goto)
       {
       TR::Node *gotoNode =  TR::Node::create(previousTree->getNode(), TR::Goto);
@@ -4846,6 +4876,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       gotoNode->setBranchDestination(toBlock(invariantBlock->getSuccessors().front()->getTo())->getEntry());
       previousTree->join(gotoTree);
       gotoTree->join(lastComparisonExit);
+
+      if (trace())
+         traceMsg(comp(), "%s: gotoNode n%dn\n", __FUNCTION__, gotoNode->getGlobalIndex());
       }
 
    if(!_neitherLoopCold ||
@@ -4878,6 +4911,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
    TR::DebugCounter::debugCounterName(comp(), "loopVersioner.coldLoop/%d/(%s)/%s/bcinfo=%d.%d", blockAtHeadOfLoop->getFrequency(), comp()->signature(), comp()->getHotnessName(comp()->getMethodHotness()), bcInfo.getCallerIndex(), bcInfo.getByteCodeIndex()),
    clonedLoopInvariantBlock->getEntry()->getNextTreeTop(), 1, TR::DebugCounter::Free);
 
+   if (trace())
+      traceMsg(comp(), "%s: clonedLoopInvariantBlock n%dn\n", __FUNCTION__, clonedLoopInvariantBlock->getNumber());
+
    // Add CFG edges correct for the newly created comparison test
    // blocks and the corresponding critical edge splitting blocks.
    //
@@ -4896,20 +4932,34 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          debugCounter = TR::DebugCounter::debugCounterName(comp(), "loopVersioner.fail/(%s)/%s/origin=block_%d", comp()->signature(), comp()->getHotnessName(comp()->getMethodHotness()), currentBlock->getNumber());
 
       if (nextComparisonBlock)
+         {
+         if (trace())
+            traceMsg(comp(), "%s: addEdge currentBlock block_%d nextComparisonBlock block_%d\n", __FUNCTION__, currentBlock->getNumber(), nextComparisonBlock->getData()->getNumber());
          _cfg->addEdge(TR::CFGEdge::createEdge(currentBlock, nextComparisonBlock->getData(), trMemory()));
+         }
       else
+         {
+         if (trace())
+            traceMsg(comp(), "%s: addEdge currentBlock block_%d invariantBlock block_%d\n", __FUNCTION__, currentBlock->getNumber(), invariantBlock->getNumber());
          _cfg->addEdge(TR::CFGEdge::createEdge(currentBlock,  invariantBlock, trMemory()));
+         }
 
       if (isTest)
          {
          if (currCriticalEdgeBlock == NULL)
             {
+            if (trace())
+               traceMsg(comp(), "%s: addEdge isTest 1 currCriticalEdgeBlock NULL currentBlock block_%d clonedLoopInvariantBlock block_%d\n", __FUNCTION__, currentBlock->getNumber(), clonedLoopInvariantBlock->getNumber());
             _cfg->addEdge(TR::CFGEdge::createEdge(currentBlock,  clonedLoopInvariantBlock, trMemory()));
             }
          else
             {
             _cfg->addEdge(TR::CFGEdge::createEdge(currentBlock, currCriticalEdgeBlock->getData(), trMemory()));
+            if (trace())
+               traceMsg(comp(), "%s: addEdge isTest 1 currentBlock block_%d currCriticalEdgeBlock block_%d\n", __FUNCTION__, currentBlock->getNumber(), currCriticalEdgeBlock->getData()->getNumber());
             _cfg->addEdge(TR::CFGEdge::createEdge(currCriticalEdgeBlock->getData(), clonedLoopInvariantBlock, trMemory()));
+            if (trace())
+               traceMsg(comp(), "%s: addEdge isTest 1 currCriticalEdgeBlock block_%d clonedLoopInvariantBlock block_%d\n", __FUNCTION__, currCriticalEdgeBlock->getData()->getNumber(), clonedLoopInvariantBlock->getNumber());
             TR::DebugCounter::prependDebugCounter(comp(), debugCounter, currCriticalEdgeBlock->getData()->getEntry()->getNextTreeTop());
             currCriticalEdgeBlock = currCriticalEdgeBlock->getNextElement();
             }
@@ -4920,6 +4970,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
 
    _cfg->addEdge(TR::CFGEdge::createEdge(clonedLoopInvariantBlock,  blockAtHeadOfClonedLoop, trMemory()));
    _cfg->setStructure(_rootStructure);
+
+   if (trace())
+      traceMsg(comp(), "%s: addEdge clonedLoopInvariantBlock block_%d blockAtHeadOfClonedLoop block_%d _rootStructure %p\n", __FUNCTION__, clonedLoopInvariantBlock->getNumber(), blockAtHeadOfClonedLoop->getNumber(), _rootStructure);
 
    // Done with trees and CFG changes
    //
@@ -4972,6 +5025,23 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
    // a corresponding critical edge splitting block and we will
    // also create/add these block structures simultaneously.
    //
+
+   if (trace())
+      {
+      traceMsg(comp(), "%s: clonedWhileNode %p %d whileNode %p %d invariantNode %p %d clonedInvariantNode %p %d\n", __FUNCTION__,
+         clonedWhileNode, clonedWhileNode->getNumber(), whileNode, whileNode->getNumber(),
+         invariantNode, invariantNode->getNumber(), clonedInvariantNode, clonedInvariantNode->getNumber());
+
+      traceMsg(comp(), "%s: clonedWhileLoop %p %d whileLoop %p %d invariantBlockStructure %p %d clonedInvariantBlockStructure %p %d parentStructure %p %d properRegion %p %d \n", __FUNCTION__,
+         clonedWhileLoop, clonedWhileLoop->getNumber(), whileLoop, whileLoop->getNumber(),
+         invariantBlockStructure, invariantBlockStructure->getNumber(), clonedInvariantBlockStructure, clonedInvariantBlockStructure->getNumber(),
+         parentStructure, parentStructure->getNumber(), properRegion, properRegion->getNumber());
+
+      traceMsg(comp(), "%s: currComparisonBlock %p %d currCriticalEdgeBlock %p %d\n", __FUNCTION__,
+         currComparisonBlock, currComparisonBlock ? currComparisonBlock->getData()->getNumber() : -1,
+         currCriticalEdgeBlock, currCriticalEdgeBlock ? currCriticalEdgeBlock->getData()->getNumber(): -1);
+      }
+
    while (currComparisonBlock)
       {
       TR::Block *actualComparisonBlock = currComparisonBlock->getData();
@@ -4983,17 +5053,31 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       TR_StructureSubGraphNode *comparisonNode = new (_cfg->structureMemoryRegion()) TR_StructureSubGraphNode(comparisonBlockStructure);
       properRegion->addSubNode(comparisonNode);
 
+      if (trace())
+         traceMsg(comp(), "%s: actualComparisonBlock block_%d comparisonBlockStructure %p %d comparisonNode %p %d\n", __FUNCTION__, actualComparisonBlock->getNumber(),
+            comparisonBlockStructure, comparisonBlockStructure->getNumber(), comparisonNode, comparisonNode->getNumber());
+
       if (prevComparisonNode)
+         {
+         if (trace())
+            traceMsg(comp(), "%s: createEdge prevComparisonNode %p %d -> comparisonNode %p %d\n", __FUNCTION__, prevComparisonNode, prevComparisonNode->getNumber(), comparisonNode, comparisonNode->getNumber());
          TR::CFGEdge::createEdge(prevComparisonNode,  comparisonNode, trMemory());
+         }
       else
          {
          regionEntryNode = comparisonNode;
          properRegion->setEntry(regionEntryNode);
+         if (trace())
+            traceMsg(comp(), "%s: regionEntryNode %p %d\n", __FUNCTION__, regionEntryNode, regionEntryNode->getNumber());
          }
 
       //TR::CFGEdge::createEdge(comparisonNode,  clonedInvariantNode, trMemory());
       prevComparisonNode = comparisonNode;
       currComparisonBlock = currComparisonBlock->getNextElement();
+
+      if (trace())
+         traceMsg(comp(), "%s: prevComparisonNode %p %d currComparisonBlock %p %d\n", __FUNCTION__, prevComparisonNode, prevComparisonNode->getNumber(),
+            currComparisonBlock, currComparisonBlock ? currComparisonBlock->getData()->getNumber() : -1);
 
       if (isTest)
          {
@@ -5002,17 +5086,32 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
             TR_StructureSubGraphNode *criticalEdgeNode = new (_cfg->structureMemoryRegion()) TR_StructureSubGraphNode(currCriticalEdgeBlock->getData()->getStructureOf());
             properRegion->addSubNode(criticalEdgeNode);
             TR::CFGEdge::createEdge(prevComparisonNode,  criticalEdgeNode, trMemory());
+            if (trace())
+               traceMsg(comp(), "%s: createEdge prevComparisonNode %p %d -> criticalEdgeNode %p %d\n", __FUNCTION__, prevComparisonNode, prevComparisonNode->getNumber(), criticalEdgeNode, criticalEdgeNode->getNumber());
             TR::CFGEdge::createEdge(criticalEdgeNode,  clonedInvariantNode, trMemory());
+            if (trace())
+               traceMsg(comp(), "%s: createEdge criticalEdgeNode %p %d -> clonedInvariantNode %p %d\n", __FUNCTION__, criticalEdgeNode, criticalEdgeNode->getNumber(), clonedInvariantNode, clonedInvariantNode->getNumber());
             currCriticalEdgeBlock = currCriticalEdgeBlock->getNextElement();
             }
          else
+            {
             TR::CFGEdge::createEdge(prevComparisonNode,  clonedInvariantNode, trMemory());
+            if (trace())
+               traceMsg(comp(), "%s: createEdge prevComparisonNode %p %d -> clonedInvariantNode %p %d\n", __FUNCTION__, prevComparisonNode, prevComparisonNode->getNumber(), clonedInvariantNode, clonedInvariantNode->getNumber());
+            }
          }
       }
 
    TR::CFGEdge::createEdge(prevComparisonNode,  invariantNode, trMemory());
    TR::CFGEdge::createEdge(invariantNode,  whileNode, trMemory());
    TR::CFGEdge::createEdge(clonedInvariantNode,  clonedWhileNode, trMemory());
+
+   if (trace())
+      {
+      traceMsg(comp(), "%s: createEdge prevComparisonNode %p %d -> invariantNode %p %d\n", __FUNCTION__, prevComparisonNode, prevComparisonNode->getNumber(), invariantNode, invariantNode->getNumber());
+      traceMsg(comp(), "%s: createEdge invariantNode %p %d -> whileNode %p %d\n", __FUNCTION__, invariantNode, invariantNode->getNumber(), whileNode, whileNode->getNumber());
+      traceMsg(comp(), "%s: createEdge clonedInvariantNode %p %d -> clonedWhileNode %p %d\n", __FUNCTION__, clonedInvariantNode, clonedInvariantNode->getNumber(), clonedWhileNode, clonedWhileNode->getNumber());
+      }
 
    // Since the new proper region replaced the original loop invariant
    // block in the parent structure, the successor of the loop
@@ -5035,6 +5134,11 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          succNode->removePredecessor(succEdge);
          subNode->removeSuccessor(succEdge);
 
+         if (trace())
+            traceMsg(comp(), "%s: properRegion %p %d succNode %p %d subNode %p %d succEdge %d -> %d\n", __FUNCTION__, properRegion, properRegion->getNumber(),
+               succNode, succNode->getNumber(), subNode, subNode->getNumber(),
+               toBlock(succEdge->getFrom())->getNumber(), toBlock(succEdge->getTo())->getNumber());
+
          for (auto changedSuccEdge = succNode->getSuccessors().begin(); changedSuccEdge != succNode->getSuccessors().end(); ++changedSuccEdge)
             {
             //
@@ -5046,10 +5150,18 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
             if ((*changedSuccEdge)->getTo() != properNode)
                {
                (*changedSuccEdge)->setFrom(properNode);
+
+               if (trace())
+                  traceMsg(comp(), "%s: properNode %p %d changedSuccEdge %d -> %d\n", __FUNCTION__, properNode, properNode->getNumber(),
+                     toBlock((*changedSuccEdge)->getFrom())->getNumber(), toBlock((*changedSuccEdge)->getTo())->getNumber());
                }
             else
                {
                properNode->removePredecessor(*changedSuccEdge);
+
+               if (trace())
+                  traceMsg(comp(), "%s: properNode %p %d removePredecessor changedSuccEdge %d -> %d\n", __FUNCTION__, properNode, properNode->getNumber(),
+                     toBlock((*changedSuccEdge)->getFrom())->getNumber(), toBlock((*changedSuccEdge)->getTo())->getNumber());
                }
             }
 
@@ -5058,6 +5170,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
 
          parentStructure->removeSubNode(succNode);
          succNode->getStructure()->setParent(properRegion);
+
+         if (trace())
+            traceMsg(comp(), "%s: properRegion %p %d parentStructure %p %d succNode %p %d \n", __FUNCTION__, properRegion, properRegion->getNumber(), parentStructure, parentStructure->getNumber(), succNode, succNode->getNumber());
          break;
          }
       }
@@ -5073,6 +5188,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       TR_StructureSubGraphNode *fromNode = toStructureSubGraphNode(exitEdge->getFrom());
       TR_Structure *fromStruct = fromNode->getStructure();
       int32_t toNum = exitEdge->getTo()->getNumber();
+
+      if (trace())
+         traceMsg(comp(), "%s: fromNode %p %d fromStruct %p %d exitEdge %d -> %d\n", __FUNCTION__, fromNode, fromNode->getNumber(), fromStruct, fromStruct->getNumber(), exitEdge->getFrom()->getNumber(), exitEdge->getTo()->getNumber());
 
       if (fromStruct == whileLoop)
          {
@@ -5094,6 +5212,8 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          else
             {
             exitEdge->setFrom(properNode);
+            if (trace())
+               traceMsg(comp(), "%s: setFrom exitEdge %d -> %d properNode %p %d\n", __FUNCTION__, exitEdge->getFrom()->getNumber(), exitEdge->getTo()->getNumber(), properNode, properNode->getNumber());
             //properNode->addSuccessor(exitEdge);
             }
          }
@@ -5110,6 +5230,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       TR_StructureSubGraphNode *newGotoBlockNode = new (_cfg->structureMemoryRegion()) TR_StructureSubGraphNode(newGotoBlockStructure);
       properRegion->addSubNode(newGotoBlockNode);
       TR::CFGEdge::createEdge(clonedWhileNode,  newGotoBlockNode, trMemory());
+
+      if (trace())
+         traceMsg(comp(), "%s: createEdge clonedWhileNode %p %d -> newGotoBlockNode %p %d\n", __FUNCTION__, clonedWhileNode, clonedWhileNode->getNumber(), newGotoBlockNode, newGotoBlockNode->getNumber());
       }
 
    // Add appropriate exit edges into the new proper region based
@@ -5133,10 +5256,14 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          if (node->getNumber() == regionEntryNode->getNumber())
             {
             TR::CFGEdge::createEdge(whileNode, regionEntryNode, trMemory());
+            if (trace())
+               traceMsg(comp(), "%s: createEdge whileNode %p %d -> regionEntryNode %p %d\n", __FUNCTION__, whileNode, whileNode->getNumber(), regionEntryNode, regionEntryNode->getNumber());
             }
          else
             {
             properRegion->addExitEdge(whileNode, node->getNumber(), isExceptionEdge);
+            if (trace())
+               traceMsg(comp(), "%s: addExitEdge whileNode %p %d -> node %p %d isExceptionEdge %d\n", __FUNCTION__, whileNode, whileNode->getNumber(), node, node->getNumber(), isExceptionEdge);
             }
          seenExitNodes.set(node->getNumber());
          }
@@ -5149,6 +5276,9 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       {
       if (exitEdge->getTo()->getNumber() == invariantBlockStructure->getNumber())
          {
+         if (trace())
+            traceMsg(comp(), "%s: exitEdge %d -> %d replaceExitPart invariantBlockStructure %p %d invariantBlockStructure %p %d\n", __FUNCTION__,
+               exitEdge->getFrom()->getNumber(), exitEdge->getTo()->getNumber(), invariantBlockStructure, invariantBlockStructure->getNumber(), properRegion, properRegion->getNumber());
          clonedWhileLoop->replaceExitPart(invariantBlockStructure->getNumber(), properRegion->getNumber());
          break;
          }
@@ -5174,10 +5304,14 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
          if (node->getNumber() == regionEntryNode->getNumber())
             {
             TR::CFGEdge::createEdge(clonedWhileNode, regionEntryNode, trMemory());
+            if (trace())
+               traceMsg(comp(), "%s: createEdge clonedWhileNode %p %d -> regionEntryNode %p %d\n", __FUNCTION__, clonedWhileNode, clonedWhileNode->getNumber(), regionEntryNode, regionEntryNode->getNumber());
             }
          else
             {
             properRegion->addExitEdge(clonedWhileNode, node->getNumber(), isExceptionEdge);
+            if (trace())
+               traceMsg(comp(), "%s: addExitEdge clonedWhileNode %p %d -> node %p %d isExceptionEdge %d\n", __FUNCTION__, clonedWhileNode, clonedWhileNode->getNumber(), node, node->getNumber(), isExceptionEdge);
             }
          seenExitNodes.set(node->getNumber());
          }
@@ -5188,6 +5322,8 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       {
       TR::Block *predBlock = toBlock(newGotoBlockStructure->getBlock()->getPredecessors().front()->getFrom());
       clonedWhileLoop->addExternalEdge(predBlock->getStructureOf(), newGotoBlockStructure->getNumber(), false);
+      if (trace())
+         traceMsg(comp(), "%s: addExternalEdge predBlock %p %d -> newGotoBlockStructure %p %d\n", __FUNCTION__, predBlock, predBlock->getNumber(), newGotoBlockStructure, newGotoBlockStructure->getNumber());
       }
 
    newGotoBlockStructuresIt.reset();
@@ -5196,11 +5332,15 @@ void TR_LoopVersioner::versionNaturalLoop(TR_RegionStructure *whileLoop, List<TR
       TR::Block *predBlock = toBlock(newGotoBlockStructure->getBlock()->getPredecessors().front()->getFrom());
       TR::Block *succBlock = toBlock(newGotoBlockStructure->getBlock()->getSuccessors().front()->getTo());
       properRegion->addExternalEdge(newGotoBlockStructure, succBlock->getStructureOf()->getNumber(), false);
+      if (trace())
+         traceMsg(comp(), "%s: addExternalEdge newGotoBlockStructure %p %d -> succBlock %p %d\n", __FUNCTION__, newGotoBlockStructure, newGotoBlockStructure->getNumber(), succBlock, succBlock->getNumber());
       properRegion->removeExternalEdgeTo(predBlock->getStructureOf(), succBlock->getStructureOf()->getNumber());
+      if (trace())
+         traceMsg(comp(), "%s: removeExternalEdgeTo predBlock %p %d -> succBlock %p %d\n", __FUNCTION__, predBlock, predBlock->getNumber(), succBlock, succBlock->getNumber());
       }
 
    if (trace())
-      comp()->dumpMethodTrees("Trees after this versioning");
+      comp()->dumpMethodTrees("Trees after this versioning (TR_LoopVersioner::versionNaturalLoop)");
    }
 
 void TR_LoopVersioner::RemoveAsyncCheck::improveLoop()
