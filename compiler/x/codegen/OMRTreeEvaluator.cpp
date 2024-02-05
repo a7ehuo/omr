@@ -2096,7 +2096,7 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
          node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
 
    static bool disableArrayCopy16BitPrimitiveEnhance = feGetEnv("TR_DisableArrayCopy16BitPrimitiveEnhance") != NULL;
-   static bool debugUseDwordCopy = feGetEnv("TR_DebugUseDwordCopy") != NULL;
+   static bool disabledDwordCopy = feGetEnv("TR_DisabledDwordCopy") != NULL;
 
    bool enableArrayCopy16BitPrimitiveEnhance = (!disableArrayCopy16BitPrimitiveEnhance && cg->comp()->target().is64Bit()) ? true : false;
 
@@ -2105,7 +2105,7 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
       {
       if (enableArrayCopy16BitPrimitiveEnhance)
          {
-         if (debugUseDwordCopy)
+         if (!disabledDwordCopy)
             arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
          else
             arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
@@ -2130,7 +2130,7 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
 
       if (enableArrayCopy16BitPrimitiveEnhance)
          {
-         if (debugUseDwordCopy)
+         if (!disabledDwordCopy)
             arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
          else
             arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
