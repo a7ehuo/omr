@@ -1951,11 +1951,14 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
       traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
          node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
 
-   static bool disableArrayCopy16BitPrimitiveEnhance = feGetEnv("TR_DisableArrayCopy16BitPrimitiveEnhance") != NULL;
+   static bool enableArrayCopy16BitPrimitiveEnhanceEnv = feGetEnv("TR_EnableArrayCopy16BitPrimitiveEnhance") != NULL;
+   bool enableArrayCopy16BitPrimitiveEnhance = (enableArrayCopy16BitPrimitiveEnhanceEnv &&
+                                                cg->comp()->target().is64Bit()) ? true : false; 
+
    generateLabelInstruction(TR::InstOpCode::label, node, mainBegLabel, cg);
    if (node->isForwardArrayCopy())
       {
-      if (!disableArrayCopy16BitPrimitiveEnhance && cg->comp()->target().is64Bit())
+      if (enableArrayCopy16BitPrimitiveEnhance)
          {
          arrayCopy16BitPrimitiveEnhance(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
          }
@@ -1977,7 +1980,7 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
 
-      if (!disableArrayCopy16BitPrimitiveEnhance && cg->comp()->target().is64Bit())
+      if (enableArrayCopy16BitPrimitiveEnhance)
          {
          arrayCopy16BitPrimitiveEnhance(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
          }
