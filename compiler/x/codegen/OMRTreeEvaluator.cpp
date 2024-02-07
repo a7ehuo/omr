@@ -1940,8 +1940,9 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
    bool trace = comp->getOption(TR_TraceCG);
    const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitiveEnhance2";
    if (trace)
-      traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
-         node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
+      traceMsg(comp, "%s: node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n", funcName, node->getGlobalIndex(),
+      comp->getDebug()->getName(srcReg), srcReg->getKind(), comp->getDebug()->getName(dstReg), dstReg->getKind(),
+      comp->getDebug()->getName(sizeReg), sizeReg->getKind());
 
    int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
 
@@ -2008,8 +2009,8 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
 
    generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
 
-   static bool disableReducedInstrunctions = feGetEnv("TR_DisableReducedInstrunctions") != NULL;
-   if (!disableReducedInstrunctions)
+   static bool enableReducedInstrunctions = feGetEnv("TR_EnableReducedInstrunctions") != NULL;
+   if (enableReducedInstrunctions)
       {
       generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg,
                                   generateX86MemoryReference(srcReg, indexReg, TR::MemoryReference::convertMultiplierToStride(4), 0, cg), cg);
