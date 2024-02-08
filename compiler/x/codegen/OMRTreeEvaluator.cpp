@@ -1696,29 +1696,10 @@ static void arrayCopy64BitPrimitiveOnIA32(TR::Node* node, TR::Register* dstReg, 
    cg->stopUsingRegister(scratch);
    }
 
-static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg, TR::CodeGenerator* cg, TR::LabelSymbol* mainEndLabel)
+static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg,
+                                            TR::Register* remainingSizeReg, TR::Register* tmpReg, TR::Register* indexReg,
+                                            TR::CodeGenerator* cg, TR::LabelSymbol* mainEndLabel)
    {
-   /*
-
-                       If size <= 64 bytes
-                                |
-                           Y    |    N
-                   +------------+-----------+
-                   |                        |
-                   |                        |
-              Use copy loop              rep movsq
-    Each iteration copy qword (8 bytes)  (8 bytes)
-                   |                        |
-                   |                        |
-                   +------------+-----------+
-                                |
-                                |
-                    Process remaining size:
-                    either 0, 2, 4, or 6
-
-
-   */
-   // OR
    /*
 
 
@@ -1746,8 +1727,8 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
    bool trace = comp->getOption(TR_TraceCG);
    const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitiveEnhance1";
    if (trace)
-      traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
-         node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
+      traceMsg(comp, "%s: node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n", funcName, node->getGlobalIndex(),
+         comp->getDebug()->getName(srcReg), srcReg->getKind(), comp->getDebug()->getName(dstReg), dstReg->getKind(), comp->getDebug()->getName(sizeReg), sizeReg->getKind());
 
    int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
 
@@ -1756,10 +1737,6 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
    TR::LabelSymbol* copyDwordLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* copyWordLabel = generateLabelSymbol(cg);
 
-   TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
-   TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
-   TR::Register *indexReg = cg->allocateRegister(TR_GPR);
-
    /*
     if size <= REP_MOVS_THRESHOLD_BYTES -> jmp to copy loop
     */
@@ -1767,24 +1744,6 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
    generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLabel, cg);
 
    // ---------------------------------
-#if 0
-   /*
-    Path 1: size > REP_MOVS_THRESHOLD_BYTES:
-       rep movsq
-       if remainder is 0 -> mainEndLabel
-       else -> copyDwordLabel
-    */
-   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
-   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 3, cg);
-
-   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg, sizeReg, cg);
-   generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 3, cg);
-   generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
-
-   generateInstruction(TR::InstOpCode::REPMOVSQ, node, cg);
-   //generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-   generateLabelInstruction(TR::InstOpCode::JMP4, node, copyDwordLabel, cg);
-#endif
    /*
     Path 1: size > REP_MOVS_THRESHOLD_BYTES:
        rep movsd
@@ -1838,13 +1797,13 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
    generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 3, cg);
    generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
 
-   generateRegImmInstruction(TR::InstOpCode::MOVRegImm4(), node, indexReg, 0, cg); // Most efficient way to set 0
-
-   generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
-
    static bool disableReducedInstrunctions = feGetEnv("TR_DisableReducedInstrunctions") != NULL;
    if (!disableReducedInstrunctions)
       {
+      generateRegImmInstruction(TR::InstOpCode::MOVRegImm4(), node, indexReg, 0, cg); // Most efficient way to set 0
+
+      generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
+
       generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg,
                                   generateX86MemoryReference(srcReg, indexReg, TR::MemoryReference::convertMultiplierToStride(8), 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S8MemReg, node,
@@ -1860,6 +1819,8 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
       }
    else
       {
+      generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
+
       generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
       generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 8, cg);
@@ -1905,13 +1866,11 @@ static void arrayCopy16BitPrimitiveEnhance1(TR::Node* node, TR::Register* dstReg
 
    generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
-
-   cg->stopUsingRegister(remainingSizeReg);
-   cg->stopUsingRegister(tmpReg);
-   cg->stopUsingRegister(indexReg);
    }
 
-static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg, TR::CodeGenerator* cg, TR::LabelSymbol* mainEndLabel)
+static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg,
+                                            TR::Register* remainingSizeReg, TR::Register* tmpReg, TR::Register* indexReg,
+                                            TR::CodeGenerator* cg, TR::LabelSymbol* mainEndLabel)
    {
    /*
 
@@ -1941,18 +1900,13 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
    const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitiveEnhance2";
    if (trace)
       traceMsg(comp, "%s: node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n", funcName, node->getGlobalIndex(),
-      comp->getDebug()->getName(srcReg), srcReg->getKind(), comp->getDebug()->getName(dstReg), dstReg->getKind(),
-      comp->getDebug()->getName(sizeReg), sizeReg->getKind());
+         comp->getDebug()->getName(srcReg), srcReg->getKind(), comp->getDebug()->getName(dstReg), dstReg->getKind(), comp->getDebug()->getName(sizeReg), sizeReg->getKind());
 
    int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
 
    TR::LabelSymbol* copyLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* copyDwordLoopLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* copyWordLabel = generateLabelSymbol(cg);
-
-   TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
-   TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
-   TR::Register *indexReg = cg->allocateRegister(TR_GPR);
 
    /*
     if size <= REP_MOVS_THRESHOLD_BYTES -> jmp to copy loop
@@ -2005,13 +1959,13 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
    generateRegImmInstruction(TR::InstOpCode::SHLRegImm1(), node, tmpReg, 2, cg);
    generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, remainingSizeReg, tmpReg, cg);
 
-   generateRegImmInstruction(TR::InstOpCode::MOVRegImm4(), node, indexReg, 0, cg); // Most efficient way to set 0
-
-   generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
-
-   static bool enableReducedInstrunctions = feGetEnv("TR_EnableReducedInstrunctions") != NULL;
-   if (enableReducedInstrunctions)
+   static bool disableReducedInstrunctions = feGetEnv("TR_DisableReducedInstrunctions") != NULL;
+   if (!disableReducedInstrunctions)
       {
+      generateRegImmInstruction(TR::InstOpCode::MOVRegImm4(), node, indexReg, 0, cg); // Most efficient way to set 0
+
+      generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
+
       generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg,
                                   generateX86MemoryReference(srcReg, indexReg, TR::MemoryReference::convertMultiplierToStride(4), 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S4MemReg, node,
@@ -2027,6 +1981,8 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
       }
    else
       {
+      generateLabelInstruction(TR::InstOpCode::label, node, copyDwordLoopLabel, cg);
+
       generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
       generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, srcReg, 4, cg);
@@ -2050,6 +2006,72 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
 
    generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+   }
+
+static void arrayCopy16BitPrimitiveEnhance3(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg, TR::CodeGenerator* cg)
+   {
+   TR::Compilation *comp = cg->comp();
+   bool trace = comp->getOption(TR_TraceCG);
+   const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitiveEnhance3";
+   if (trace)
+      traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
+         node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
+
+   TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
+   TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
+   TR::Register *indexReg = cg->allocateRegister(TR_GPR);
+
+   TR::RegisterDependencyConditions* dependencies = generateRegisterDependencyConditions((uint8_t)6, (uint8_t)6, cg);
+
+   dependencies->addPreCondition(srcReg, TR::RealRegister::esi, cg);
+   dependencies->addPreCondition(dstReg, TR::RealRegister::edi, cg);
+   dependencies->addPreCondition(sizeReg, TR::RealRegister::ecx, cg);
+   dependencies->addPreCondition(remainingSizeReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(indexReg, TR::RealRegister::NoReg, cg);
+
+   dependencies->addPostCondition(srcReg, TR::RealRegister::esi, cg);
+   dependencies->addPostCondition(dstReg, TR::RealRegister::edi, cg);
+   dependencies->addPostCondition(sizeReg, TR::RealRegister::ecx, cg);
+   dependencies->addPostCondition(remainingSizeReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(indexReg, TR::RealRegister::NoReg, cg);
+
+   TR::LabelSymbol* mainBegLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* mainEndLabel = generateLabelSymbol(cg);
+   mainBegLabel->setStartInternalControlFlow();
+   mainEndLabel->setEndInternalControlFlow();
+
+   generateLabelInstruction(TR::InstOpCode::label, node, mainBegLabel, cg);
+   if (node->isForwardArrayCopy())
+      {
+      arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+      //arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+      }
+   else // decide direction during runtime
+      {
+      TR::LabelSymbol* backwardLabel = generateLabelSymbol(cg);
+
+      generateRegRegInstruction(TR::InstOpCode::SUBRegReg(), node, dstReg, srcReg, cg);  // dst = dst - src
+      generateRegRegInstruction(TR::InstOpCode::CMPRegReg(), node, dstReg, sizeReg, cg); // cmp dst, size
+      generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
+      generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
+
+      arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+      //arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+
+      {
+      TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
+      generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, srcReg, generateX86MemoryReference(srcReg, sizeReg, 0, -2, cg), cg);
+      generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, sizeReg, 0, -2, cg), cg);
+      generateInstruction(TR::InstOpCode::STD, node, cg);
+      generateRepMovsInstruction(TR::InstOpCode::REPMOVSW, node, sizeReg, NULL, cg);
+      generateInstruction(TR::InstOpCode::CLD, node, cg);
+      generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+      og.endOutlinedInstructionSequence();
+      }
+      }
+   generateLabelInstruction(TR::InstOpCode::label, node, mainEndLabel, dependencies, cg);
 
    cg->stopUsingRegister(remainingSizeReg);
    cg->stopUsingRegister(tmpReg);
@@ -2076,6 +2098,13 @@ static void arrayCopy16BitPrimitiveEnhance2(TR::Node* node, TR::Register* dstReg
 */
 static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg, TR::CodeGenerator* cg)
    {
+   TR::Compilation *comp = cg->comp();
+   bool trace = comp->getOption(TR_TraceCG);
+   const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitive";
+   if (trace)
+      traceMsg(comp, "%s: node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n", funcName, node->getGlobalIndex(),
+         comp->getDebug()->getName(srcReg), srcReg->getKind(), comp->getDebug()->getName(dstReg), dstReg->getKind(), comp->getDebug()->getName(sizeReg), sizeReg->getKind());
+
    TR::RegisterDependencyConditions* dependencies = generateRegisterDependencyConditions((uint8_t)3, (uint8_t)3, cg);
    dependencies->addPreCondition(srcReg, TR::RealRegister::esi, cg);
    dependencies->addPreCondition(dstReg, TR::RealRegister::edi, cg);
@@ -2089,36 +2118,14 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
    mainBegLabel->setStartInternalControlFlow();
    mainEndLabel->setEndInternalControlFlow();
 
-   TR::Compilation *comp = cg->comp();
-   bool trace = comp->getOption(TR_TraceCG);
-   const char *funcName = "OMR::X86::TreeEvaluator::arrayCopy16BitPrimitive";
-   if (trace)
-      traceMsg(comp, "%s: node n%dn srcReg %s dstReg %s sizeReg %s\n", funcName,
-         node->getGlobalIndex(), comp->getDebug()->getName(srcReg), comp->getDebug()->getName(dstReg), comp->getDebug()->getName(sizeReg));
-
-   static bool disableArrayCopy16BitPrimitiveEnhance = feGetEnv("TR_DisableArrayCopy16BitPrimitiveEnhance") != NULL;
-   static bool disabledDwordCopy = feGetEnv("TR_DisabledDwordCopy") != NULL;
-
-   bool enableArrayCopy16BitPrimitiveEnhance = (!disableArrayCopy16BitPrimitiveEnhance && cg->comp()->target().is64Bit()) ? true : false;
-
    generateLabelInstruction(TR::InstOpCode::label, node, mainBegLabel, cg);
    if (node->isForwardArrayCopy())
       {
-      if (enableArrayCopy16BitPrimitiveEnhance)
-         {
-         if (!disabledDwordCopy)
-            arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
-         else
-            arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
-         }
-      else
-         {
-         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
-         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
-         }
+      generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+      generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+      generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+      generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+      generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
       }
    else // decide direction during runtime
       {
@@ -2129,21 +2136,11 @@ static void arrayCopy16BitPrimitive(TR::Node* node, TR::Register* dstReg, TR::Re
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
 
-      if (enableArrayCopy16BitPrimitiveEnhance)
-         {
-         if (!disabledDwordCopy)
-            arrayCopy16BitPrimitiveEnhance2(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
-         else
-            arrayCopy16BitPrimitiveEnhance1(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
-         }
-      else
-         {
-         generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
-         generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
-         generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
-         generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
-         generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
-         }
+      generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+      generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+      generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+      generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+      generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
 
       {
       TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
@@ -2583,10 +2580,6 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
    TR::Node* dstNode  = node->getChild(1); // the address of memory to copy to
    TR::Node* sizeNode = node->getChild(2); // the size of memory to copy, in bytes
 
-   TR::Compilation *comp = cg->comp();
-   bool trace = comp->getOption(TR_TraceCG);
-   const char *funcName = "OMR::X86::TreeEvaluator::arraycopyEvaluator";
-
    TR::Register* srcReg = cg->gprClobberEvaluate(srcNode, TR::InstOpCode::MOVRegReg());
    TR::Register* dstReg = cg->gprClobberEvaluate(dstNode, TR::InstOpCode::MOVRegReg());
 
@@ -2601,6 +2594,10 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
       else
          elementSize = TR::Symbol::convertTypeToSize(dt);
       }
+
+   TR::Compilation *comp = cg->comp();
+   bool trace = comp->getOption(TR_TraceCG);
+   const char *funcName = "OMR::X86::TreeEvaluator::arraycopyEvaluator";
 
    if (trace)
       traceMsg(comp, "%s: node n%dn srcNode n%dn srcReg %s dstNode n%dn dstReg %s sizeNode n%dn elementSize %d %s\n", funcName,
@@ -2662,8 +2659,17 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
          }
       else if (elementSize == 2 && !useREPMOVSW)
          {
-         if (trace) traceMsg(comp, "%s: calling arrayCopy16BitPrimitive\n", funcName);
-         arrayCopy16BitPrimitive(node, dstReg, srcReg, sizeReg, cg);
+         static bool disableArrayCopy16BitPrimitiveEnhance = feGetEnv("TR_DisableArrayCopy16BitPrimitiveEnhance") != NULL;
+         bool enableArrayCopy16BitPrimitiveEnhance = (!disableArrayCopy16BitPrimitiveEnhance && cg->comp()->target().is64Bit()) ? true : false;
+
+         if (enableArrayCopy16BitPrimitiveEnhance)
+            {
+            arrayCopy16BitPrimitiveEnhance3(node, dstReg, srcReg, sizeReg, cg);
+            }
+         else
+            {
+            arrayCopy16BitPrimitive(node, dstReg, srcReg, sizeReg, cg);
+            }
          }
       else
          {
