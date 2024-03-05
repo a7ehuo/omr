@@ -198,6 +198,10 @@ static bool containsNode(TR::Node *containerNode, TR::Node *nodeToSwingDown, vco
       else if (containerNode->getSymbol()->isShadow() || containerNode->getSymbol()->isStatic())
          canMoveIfVolatile = false;
       }
+   else // If we don't know what kind of container node it is, do not allow to swing down volatile nodes
+      {
+      canMoveIfVolatile = false;
+      }
 
    (*height)++;
    if (*height > *maxHeight)
