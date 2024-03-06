@@ -1696,7 +1696,420 @@ static void arrayCopy64BitPrimitiveOnIA32(TR::Node* node, TR::Register* dstReg, 
    cg->stopUsingRegister(scratch);
    }
 
-static void arrayCopy16BitPrimitiveEnhanceImpl(TR::Node* node,
+static void arrayCopy16BitPrimitiveEnhanceImpl5(TR::Node* node,
+                                            TR::Register* dstReg,
+                                            TR::Register* srcReg,
+                                            TR::Register* sizeReg,
+                                            TR::CodeGenerator* cg,
+                                            TR::LabelSymbol* mainEndLabel)
+   {
+   TR::LabelSymbol* repMovsLabel = generateLabelSymbol(cg);
+
+   TR::LabelSymbol* copy2BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy8To15BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy16To31BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy32To64BytesLabel = generateLabelSymbol(cg);
+
+   int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
+   if (cg->comp()->getOption(TR_TraceCG))
+      {
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl5 node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n",
+         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
+         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind());
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl5 REP_MOVS_THRESHOLD_BYTES %d supportsAVX %d supportsERMSB %d\n",
+         REP_MOVS_THRESHOLD_BYTES, cg->comp()->target().cpu.supportsAVX(), cg->comp()->target().cpu.supportsERMSB());
+      }
+
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
+   generateLabelInstruction(TR::InstOpCode::JA4, node, repMovsLabel, cg);
+
+   /* ---------------------------------
+    * size < REP_MOVS_THRESHOLD_BYTES
+    */
+   generateInstruction(TR::InstOpCode::REPMOVSB, node, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   /* ---------------------------------
+    * size > REP_MOVS_THRESHOLD_BYTES
+    *   rep movsd
+    *   if remainder is 0 -> mainEndLabel
+    *   process remainder
+    *
+    * mainEndLabel:
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, repMovsLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+   generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+   }
+
+static void arrayCopy16BitPrimitiveEnhanceImpl4(TR::Node* node,
+                                            TR::Register* dstReg,
+                                            TR::Register* srcReg,
+                                            TR::Register* sizeReg,
+                                            TR::Register* tmpReg1,
+                                            TR::Register* tmpReg2,
+                                            TR::Register* tmpXmmReg1,
+                                            TR::Register* tmpXmmReg2,
+                                            TR::Register* tmpYmmReg1,
+                                            TR::Register* tmpYmmReg2,
+                                            TR::CodeGenerator* cg,
+                                            TR::LabelSymbol* mainEndLabel)
+   {
+   TR::LabelSymbol* repMovsLabel = generateLabelSymbol(cg);
+
+   TR::LabelSymbol* copy2BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy8To15BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy16To31BytesLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy32To64BytesLabel = generateLabelSymbol(cg);
+
+   int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
+   if (cg->comp()->getOption(TR_TraceCG))
+      {
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl4 node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d REP_MOVS_THRESHOLD_BYTES %d supportsAVX %d\n",
+         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
+         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind(),
+         REP_MOVS_THRESHOLD_BYTES, cg->comp()->target().cpu.supportsAVX());
+      }
+
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
+   generateLabelInstruction(TR::InstOpCode::JA4, node, repMovsLabel, cg);
+   //generateLabelInstruction(TR::InstOpCode::JAE4, node, repMovsLabel, cg);
+
+   /* ---------------------------------
+    * size < REP_MOVS_THRESHOLD_BYTES
+    *
+    cmp size 16
+    jae copy_16_31
+    cmp size 4
+    jb  copy_2
+
+    src + size - 4 // copy 4, 6
+    src
+
+    copy_2:
+    src + size - 2
+    src
+
+    copy_16_31:
+
+
+    size = 2
+    size = 4,6
+    8 <= size < 16
+    16 <= size < 31
+    */
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 32, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE4, node, copy32To64BytesLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 16, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE4, node, copy16To31BytesLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 8, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE4, node, copy8To15BytesLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 4, cg);
+   generateLabelInstruction(TR::InstOpCode::JB4, node, copy2BytesLabel, cg);
+
+   // 4 or 6 Bytes
+   generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg1, generateX86MemoryReference(srcReg, sizeReg, 0, -4, cg), cg);
+   generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -4, cg), tmpReg1, cg);
+   generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   // 2 Bytes
+   generateLabelInstruction(TR::InstOpCode::label, node, copy2BytesLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg1, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg1, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   // 8-15 Bytes
+   generateLabelInstruction(TR::InstOpCode::label, node, copy8To15BytesLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg1, generateX86MemoryReference(srcReg, sizeReg, 0, -8, cg), cg);
+   generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -8, cg), tmpReg1, cg);
+   generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   // 16-31 Bytes
+   generateLabelInstruction(TR::InstOpCode::label, node, copy16To31BytesLabel, cg);
+   //TR::InstOpCode::Mnemonic loadOpCode = cg->comp()->target().cpu.supportsAVX() ? InstOpCode::VMOVDQUYmmMem : TR::InstOpCode::MOVDQURegMem;
+   //TR::InstOpCode::Mnemonic storeOpCode = cg->comp()->target().cpu.supportsAVX() ? InstOpCode::VMOVDQUMemYmm : TR::InstOpCode::MOVDQUMemReg;
+   generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmReg1, generateX86MemoryReference(srcReg, sizeReg, 0, -16, cg), cg);
+   generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -16, cg), tmpXmmReg1, cg);
+   generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmReg2, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   // 32-64 Bytes
+   generateLabelInstruction(TR::InstOpCode::label, node, copy32To64BytesLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::InstOpCode::VMOVDQUYmmMem, node, tmpYmmReg1, generateX86MemoryReference(srcReg, sizeReg, 0, -32, cg), cg);
+   generateRegMemInstruction(TR::InstOpCode::InstOpCode::VMOVDQUYmmMem, node, tmpYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpYmmReg1, cg);
+   generateMemRegInstruction(TR::InstOpCode::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpYmmReg2, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   /* ---------------------------------
+    * size > REP_MOVS_THRESHOLD_BYTES
+    *   rep movsd
+    *   if remainder is 0 -> mainEndLabel
+    *   process remainder
+    *
+    * mainEndLabel:
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, repMovsLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+   generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+   }
+
+static void arrayCopy16BitPrimitiveEnhanceImpl3(TR::Node* node,
+                                            TR::Register* dstReg,
+                                            TR::Register* srcReg,
+                                            TR::Register* sizeReg,
+                                            TR::Register* tmpReg, /* tmpReg1:edx */
+                                            TR::Register* remainingSizeReg,  /* tmpReg2 */
+                                            TR::Register* indexReg,  /* tmpReg3 */
+                                            TR::CodeGenerator* cg,
+                                            TR::LabelSymbol* mainEndLabel)
+   {
+   TR::LabelSymbol* repMovsLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copyQwordLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copyQwordLoopLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copyResidueLabel = generateLabelSymbol(cg);
+
+   int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
+   if (cg->comp()->getOption(TR_TraceCG))
+      {
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl3 node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d REP_MOVS_THRESHOLD_BYTES %d\n",
+         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
+         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind(), REP_MOVS_THRESHOLD_BYTES);
+      }
+
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
+   generateLabelInstruction(TR::InstOpCode::JA4, node, repMovsLabel, cg);
+
+   /* ---------------------------------
+    * size < REP_MOVS_THRESHOLD_BYTES
+    *
+    * remainingSizeReg = size / 8
+    * size = size % 8
+    *
+    * jz copyQwordLabel  // remain = 0
+    */
+   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, sizeReg, 0x7, cg); // size = size % 8
+   generateLabelInstruction(TR::InstOpCode::JE4, node, copyQwordLabel, cg);
+
+   TR::MemoryReference *residueLabelMR = generateX86MemoryReference(copyResidueLabel, cg);
+#if 0
+   if (residueLabelMR->getAddressRegister())
+      {
+      deps->addPostCondition(residueLabelMR->getAddressRegister(), TR::RealRegister::NoReg, cg);
+      }
+#endif
+
+   // remaining 2, 4, 6 => 1, 2, 3 => 0, 1, 2
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 1, cg);
+   generateRegImmInstruction(TR::InstOpCode::SUBRegImms(), node, sizeReg, 1, cg);
+
+   const int copy_instruction_size = 8; // L2RegMem + S2MemReg
+   generateRegRegImmInstruction(TR::InstOpCode::IMULRegRegImm4(), node, sizeReg, sizeReg, -copy_instruction_size, cg);
+   generateRegImmInstruction(TR::InstOpCode::ADD4RegImm4, node, sizeReg, copy_instruction_size * 2, cg);
+
+   generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, tmpReg, residueLabelMR, cg);
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, sizeReg, tmpReg, cg);
+
+   generateRegInstruction(TR::InstOpCode::JMPReg, node, sizeReg, cg);
+
+   generateLabelInstruction(TR::InstOpCode::label, node, copyResidueLabel, cg);
+   for (int i = 0; i < 3; i++)
+      {
+      int offset = 2 * (2 - i);
+      generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, offset, cg), cg);
+      generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, offset, cg), tmpReg, cg);
+      }
+
+   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, sizeReg, remainingSizeReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 3, cg); // size / 8
+   generateLabelInstruction(TR::InstOpCode::JE4, node, mainEndLabel, cg);
+
+   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, sizeReg, remainingSizeReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, sizeReg, 0x7, cg); // size = size % 8
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, srcReg, sizeReg, cg);
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, dstReg, sizeReg, cg);
+
+   /*
+    * copy_qword_loop:
+    * cmp rounds 0
+    * je main_end
+    * rounds = round - 1
+
+    * jmp copy_qword_loop
+    *
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLabel, cg);
+
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, remainingSizeReg, 3, cg);
+   generateLabelInstruction(TR::InstOpCode::JE4, node, mainEndLabel, cg);
+
+   generateRegRegInstruction(TR::InstOpCode::XOR8RegReg, node, indexReg, indexReg, cg); // index = 0
+
+   generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg,
+                                 generateX86MemoryReference(srcReg, indexReg, TR::MemoryReference::convertMultiplierToStride(8), 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S8MemReg, node,
+                                  generateX86MemoryReference(dstReg, indexReg, TR::MemoryReference::convertMultiplierToStride(8), 0, cg), tmpReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, indexReg, 1, cg);
+   generateRegRegInstruction(TR::InstOpCode::CMPRegReg(), node, indexReg, remainingSizeReg, cg);
+   generateLabelInstruction(TR::InstOpCode::JNE4, node, copyQwordLoopLabel, cg);
+
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+
+   /* ---------------------------------
+    * size > REP_MOVS_THRESHOLD_BYTES
+    *   rep movsd
+    *   if remainder is 0 -> mainEndLabel
+    *   process remainder
+    *
+    * mainEndLabel:
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, repMovsLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+   generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+   }
+
+static void arrayCopy16BitPrimitiveEnhanceImpl2(TR::Node* node,
+                                            TR::Register* dstReg,
+                                            TR::Register* srcReg,
+                                            TR::Register* sizeReg,
+                                            TR::Register* tmpReg,
+                                            TR::Register* remainingSizeReg,
+                                            TR::Register* indexReg,
+                                            TR::CodeGenerator* cg,
+                                            TR::LabelSymbol* mainEndLabel)
+   {
+   TR::LabelSymbol* repMovsLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copyQwordLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copyQwordLoopLabel = generateLabelSymbol(cg);
+   TR::LabelSymbol* copy6BytesOr4BytesLabel = generateLabelSymbol(cg);
+
+   int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
+   if (cg->comp()->getOption(TR_TraceCG))
+      {
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl2 node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d REP_MOVS_THRESHOLD_BYTES %d\n",
+         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
+         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind(), REP_MOVS_THRESHOLD_BYTES);
+      }
+
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
+   generateLabelInstruction(TR::InstOpCode::JA4, node, repMovsLabel, cg);
+
+   /* ---------------------------------
+    * size < REP_MOVS_THRESHOLD_BYTES
+    *
+    * remainingSizeReg = size
+    * size = size % 8
+    *
+    * jz copy_qword_loop  // remain = 0
+    */
+   generateRegRegInstruction(TR::InstOpCode::XOR8RegReg, node, indexReg, indexReg, cg); // index = 0
+   generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, remainingSizeReg, sizeReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, sizeReg, 0x7, cg); // size = size % 8
+   generateLabelInstruction(TR::InstOpCode::JE4, node, copyQwordLabel, cg);
+
+   /*
+    * cmp size 4  // size >= 4
+    * jae remain_6_4
+    *
+    * copy word  // remain = 2
+    * jmp  copy_qword_loop
+    */
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 4, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE4, node, copy6BytesOr4BytesLabel, cg);
+
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, indexReg, 2, cg);
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, copyQwordLabel, cg);
+
+   /*
+    * remain_6_4:
+    * copy dword
+    * cmp size 6
+    * jl  copy_qword_loop
+    * copy word
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, copy6BytesOr4BytesLabel, cg);
+
+   generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg, cg);
+
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, indexReg, 4, cg);
+   generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 6, cg);
+   generateLabelInstruction(TR::InstOpCode::JL4, node, copyQwordLabel, cg);
+
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg, generateX86MemoryReference(srcReg, indexReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, indexReg, 0, cg), tmpReg, cg);
+
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, indexReg, 2, cg);
+
+   /*
+    * copy_qword_loop:
+    * remainingSizeReg = size / 8
+    * je main_end
+    * rounds = round - 1
+    * jmp copy_qword_loop
+    *
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLabel, cg);
+
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, remainingSizeReg, 3, cg);
+   generateLabelInstruction(TR::InstOpCode::JE4, node, mainEndLabel, cg);
+
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, srcReg, indexReg, cg);
+   generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, dstReg, indexReg, cg);
+   generateRegRegInstruction(TR::InstOpCode::XOR8RegReg, node, indexReg, indexReg, cg); // index = 0
+
+   generateLabelInstruction(TR::InstOpCode::label, node, copyQwordLoopLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg,
+                                 generateX86MemoryReference(srcReg, indexReg, TR::MemoryReference::convertMultiplierToStride(8), 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S8MemReg, node,
+                                  generateX86MemoryReference(dstReg, indexReg, TR::MemoryReference::convertMultiplierToStride(8), 0, cg), tmpReg, cg);
+   generateRegImmInstruction(TR::InstOpCode::ADDRegImms(), node, indexReg, 1, cg);
+   generateRegRegInstruction(TR::InstOpCode::CMPRegReg(), node, indexReg, remainingSizeReg, cg);
+   generateLabelInstruction(TR::InstOpCode::JNE4, node, copyQwordLoopLabel, cg);
+
+   generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
+
+   /* ---------------------------------
+    * size > REP_MOVS_THRESHOLD_BYTES
+    *   rep movsd
+    *   if remainder is 0 -> mainEndLabel
+    *   process remainder
+    *
+    * mainEndLabel:
+    */
+   generateLabelInstruction(TR::InstOpCode::label, node, repMovsLabel, cg);
+   generateRegImmInstruction(TR::InstOpCode::SHRRegImm1(), node, sizeReg, 2, cg);
+   generateInstruction(TR::InstOpCode::REPMOVSD, node, cg);
+   generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
+   generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
+   generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+   }
+
+static void arrayCopy16BitPrimitiveEnhanceImpl1(TR::Node* node,
                                             TR::Register* dstReg,
                                             TR::Register* srcReg,
                                             TR::Register* sizeReg,
@@ -1728,13 +2141,6 @@ static void arrayCopy16BitPrimitiveEnhanceImpl(TR::Node* node,
     *                                    |
     *                               mainEndLabel
     */
-   if (cg->comp()->getOption(TR_TraceCG))
-      {
-      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhance node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d\n",
-         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
-         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind());
-      }
-
    TR::LabelSymbol* copyLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* copyQwordLoopLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* copyDwordLabel = generateLabelSymbol(cg);
@@ -1742,6 +2148,14 @@ static void arrayCopy16BitPrimitiveEnhanceImpl(TR::Node* node,
 
    // If size <= REP_MOVS_THRESHOLD_BYTES -> jmp to copy loop
    int32_t REP_MOVS_THRESHOLD_BYTES = 64; // 64 bytes
+
+   if (cg->comp()->getOption(TR_TraceCG))
+      {
+      traceMsg(cg->comp(), "arrayCopy16BitPrimitiveEnhanceImpl1 node n%dn srcReg %s %d dstReg %s %d sizeReg %s %d REP_MOVS_THRESHOLD_BYTES %d\n",
+         node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), srcReg->getKind(),
+         cg->comp()->getDebug()->getName(dstReg), dstReg->getKind(), cg->comp()->getDebug()->getName(sizeReg), sizeReg->getKind(), REP_MOVS_THRESHOLD_BYTES);
+      }
+
    generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, REP_MOVS_THRESHOLD_BYTES, cg);
    generateLabelInstruction(TR::InstOpCode::JLE4, node, copyLabel, cg);
 
@@ -1866,35 +2280,72 @@ static void arrayCopy16BitPrimitiveEnhanceImpl(TR::Node* node,
 
 static void arrayCopy16BitPrimitiveEnhance(TR::Node* node, TR::Register* dstReg, TR::Register* srcReg, TR::Register* sizeReg, TR::CodeGenerator* cg)
    {
-   TR::Register *remainingSizeReg = cg->allocateRegister(TR_GPR);
-   TR::Register *tmpReg = cg->allocateRegister(TR_GPR);
-   TR::Register *indexReg = cg->allocateRegister(TR_GPR);
+   TR::Register *tmpReg1 = cg->allocateRegister(TR_GPR);
+   TR::Register *tmpReg2 = cg->allocateRegister(TR_GPR);
+   TR::Register *tmpReg3 = cg->allocateRegister(TR_GPR);
 
-   TR::RegisterDependencyConditions* dependencies = generateRegisterDependencyConditions((uint8_t)6, (uint8_t)6, cg);
+   TR::Register *tmpXmmReg1 = cg->allocateRegister(TR_FPR);
+   TR::Register *tmpXmmReg2 = cg->allocateRegister(TR_FPR);
+   TR::Register *tmpYmmReg1 = cg->allocateRegister(TR_FPR);
+   TR::Register *tmpYmmReg2 = cg->allocateRegister(TR_FPR);
+
+   TR::RegisterDependencyConditions* dependencies = generateRegisterDependencyConditions((uint8_t)10, (uint8_t)10, cg);
 
    dependencies->addPreCondition(srcReg, TR::RealRegister::esi, cg);
    dependencies->addPreCondition(dstReg, TR::RealRegister::edi, cg);
    dependencies->addPreCondition(sizeReg, TR::RealRegister::ecx, cg);
-   dependencies->addPreCondition(remainingSizeReg, TR::RealRegister::NoReg, cg);
-   dependencies->addPreCondition(tmpReg, TR::RealRegister::NoReg, cg);
-   dependencies->addPreCondition(indexReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpReg1, TR::RealRegister::edx, cg);
+   dependencies->addPreCondition(tmpReg2, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpReg3, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpXmmReg1, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpXmmReg2, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpYmmReg1, TR::RealRegister::NoReg, cg);
+   dependencies->addPreCondition(tmpYmmReg2, TR::RealRegister::NoReg, cg);
 
    dependencies->addPostCondition(srcReg, TR::RealRegister::esi, cg);
    dependencies->addPostCondition(dstReg, TR::RealRegister::edi, cg);
    dependencies->addPostCondition(sizeReg, TR::RealRegister::ecx, cg);
-   dependencies->addPostCondition(remainingSizeReg, TR::RealRegister::NoReg, cg);
-   dependencies->addPostCondition(tmpReg, TR::RealRegister::NoReg, cg);
-   dependencies->addPostCondition(indexReg, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpReg1, TR::RealRegister::edx, cg);
+   dependencies->addPostCondition(tmpReg2, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpReg3, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpXmmReg1, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpXmmReg2, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpYmmReg1, TR::RealRegister::NoReg, cg);
+   dependencies->addPostCondition(tmpYmmReg2, TR::RealRegister::NoReg, cg);
 
    TR::LabelSymbol* mainBegLabel = generateLabelSymbol(cg);
    TR::LabelSymbol* mainEndLabel = generateLabelSymbol(cg);
    mainBegLabel->setStartInternalControlFlow();
    mainEndLabel->setEndInternalControlFlow();
 
+   static bool enableProto2 = feGetEnv("TR_EnableProto2") != NULL;
+   static bool enableProto3 = feGetEnv("TR_EnableProto3") != NULL;
+   static bool enableProto4 = feGetEnv("TR_EnableProto4") != NULL;
+   static bool enableProto5 = feGetEnv("TR_EnableProto5") != NULL;
+
    generateLabelInstruction(TR::InstOpCode::label, node, mainBegLabel, cg);
    if (node->isForwardArrayCopy())
       {
-      arrayCopy16BitPrimitiveEnhanceImpl(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+      if (enableProto2)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl2(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
+      else if (enableProto3)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl3(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
+      else if (enableProto4)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl4(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpXmmReg1, tmpXmmReg2, tmpYmmReg1, tmpYmmReg2, cg, mainEndLabel);
+         }
+      else if (enableProto5)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl5(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
+         }
+      else
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl1(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
       }
    else // decide direction during runtime
       {
@@ -1905,7 +2356,26 @@ static void arrayCopy16BitPrimitiveEnhance(TR::Node* node, TR::Register* dstReg,
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
 
-      arrayCopy16BitPrimitiveEnhanceImpl(node, dstReg, srcReg, sizeReg, remainingSizeReg, tmpReg, indexReg, cg, mainEndLabel);
+      if (enableProto2)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl2(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
+      else if (enableProto3)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl3(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
+      else if (enableProto4)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl4(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpXmmReg1, tmpXmmReg2, tmpYmmReg1, tmpYmmReg2, cg, mainEndLabel);
+         }
+      else if (enableProto5)
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl5(node, dstReg, srcReg, sizeReg, cg, mainEndLabel);
+         }
+      else
+         {
+         arrayCopy16BitPrimitiveEnhanceImpl1(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, mainEndLabel);
+         }
 
       {
       TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
@@ -1920,9 +2390,11 @@ static void arrayCopy16BitPrimitiveEnhance(TR::Node* node, TR::Register* dstReg,
       }
    generateLabelInstruction(TR::InstOpCode::label, node, mainEndLabel, dependencies, cg);
 
-   cg->stopUsingRegister(remainingSizeReg);
-   cg->stopUsingRegister(tmpReg);
-   cg->stopUsingRegister(indexReg);
+   cg->stopUsingRegister(tmpReg1);
+   cg->stopUsingRegister(tmpReg2);
+   cg->stopUsingRegister(tmpReg3);
+   cg->stopUsingRegister(tmpXmmReg1);
+   cg->stopUsingRegister(tmpXmmReg2);
    }
 
 /** \brief

@@ -234,6 +234,12 @@ OMR::X86::CPU::supportsAVX()
    }
 
 bool
+OMR::X86::CPU::supportsERMSB()
+   {
+   return TR::CodeGenerator::getX86ProcessorInfo().supportsERMSB();
+   }
+
+bool
 OMR::X86::CPU::is(OMRProcessorArchitecture p)
    {
    if (TR::Compiler->omrPortLib == NULL)

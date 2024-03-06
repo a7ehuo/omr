@@ -187,6 +187,8 @@ struct TR_X86ProcessorInfo
    bool supportsSFence()                   {return testFeatureFlags(TR_SSE | TR_MMXInstructions);}
    bool prefersMultiByteNOP()              {return getX86Architecture() && isGenuineIntel() && !isIntelPentium();}
 
+   bool supportsERMSB()                    {return testFeatureFlags8(TR_ERMSB);}
+
    uint32_t getCPUStepping(uint32_t signature)       {return (signature & CPUID_SIGNATURE_STEPPING_MASK);}
    uint32_t getCPUModel(uint32_t signature)          {return (signature & CPUID_SIGNATURE_MODEL_MASK) >> 4;}
    uint32_t getCPUFamily(uint32_t signature)         {return (signature & CPUID_SIGNATURE_FAMILY_MASK) >> 8;}

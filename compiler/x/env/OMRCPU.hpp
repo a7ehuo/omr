@@ -101,6 +101,7 @@ public:
    bool supportsSFence();
    bool prefersMultiByteNOP();
    bool supportsAVX();
+   bool supportsERMSB();
 
    /**
     * It is generally safe to assume that all modern operating systems
