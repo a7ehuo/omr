@@ -787,6 +787,8 @@ OMR::RegisterCandidate::processLiveOnEntryBlocks(TR::Block * * blocks, int32_t *
          for (auto e = block->getPredecessors().begin(); e != block->getPredecessors().end(); ++e)
             {
             TR_ASSERT(comp->getOptimizer()->cachedExtendedBBInfoValid(), "Incorrect value in _startOfExtendedBBForBB");
+            if (trace)
+               traceMsg(comp, "%s: block %p block_%d getFrom block %p\n", __FUNCTION__, block, block->getNumber(), ((*e)->getFrom())->asBlock());
             if (_liveOnEntry.get(startOfExtendedBBForBB[toBlock((*e)->getFrom())->getNumber()]->getNumber()))
             //if (_liveOnEntry.get(toBlock(e->getFrom())->getNumber()))
                { referencedInPred = true; break; }

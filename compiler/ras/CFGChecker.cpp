@@ -72,11 +72,11 @@ void TR_CFGChecker::check()
    _numBlocks = _cfg->getNumberOfNodes();
    _numRealBlocks = _numBlocks-2;
 
-   if (debug("traceCFGCHK"))
+   //if (debug("traceCFGCHK"))
       {
-      _cfg->comp()->dumpMethodTrees("Printing out the TreeTops from CFGChecker");
-      if (_outFile) trfprintf(_outFile, "Printing out the CFG from CFGChecker\n");
-      _cfg->comp()->getDebug()->print(_cfg->comp()->getOutFile(), _cfg);
+      if (_outFile) _cfg->comp()->dumpMethodTrees("Printing out the TreeTops from CFGChecker");
+      //if (_outFile) trfprintf(_outFile, "Printing out the CFG from CFGChecker\n");
+      //if (_outFile) _cfg->comp()->getDebug()->print(_cfg->comp()->getOutFile(), _cfg);
       }
 
    // All blocks in the CFG will be marked with this visit count, so we know
@@ -86,18 +86,18 @@ void TR_CFGChecker::check()
    markCFGNodes();
 
 
-#if defined(DEBUG) || (defined(PROD_WITH_ASSUMES) && !defined(DISABLE_CFG_CHECK))
+//#if defined(DEBUG) || (defined(PROD_WITH_ASSUMES) && !defined(DISABLE_CFG_CHECK))
    performCorrectnessCheck();
    performConsistencyCheck();
-#else
-   _successorsCorrect = true;
-   _isCFGConsistent = true;
-#endif
+//#else
+//   _successorsCorrect = true;
+//   _isCFGConsistent = true;
+//#endif
    } // scope of the stack memory region
 
    if (_successorsCorrect && _isCFGConsistent)
       {
-      if (debug("traceCFGCHK"))
+      //if (debug("traceCFGCHK"))
          if (_outFile) trfprintf(_outFile, "The CFG is correct\n");
       }
    else
@@ -107,8 +107,8 @@ void TR_CFGChecker::check()
          trfprintf(_outFile, "The CFG is NOT correct\n");
          trfflush(_outFile);
          }
-      if (_outFile) trfprintf(_outFile, "Printing out the CFG from CFGChecker\n");
-      _cfg->comp()->getDebug()->print(_cfg->comp()->getOutFile(), _cfg);
+      //if (_outFile) trfprintf(_outFile, "Printing out the CFG from CFGChecker\n");
+      //if (_outFile) _cfg->comp()->getDebug()->print(_cfg->comp()->getOutFile(), _cfg);
       TR_ASSERT(0, "The CFG is NOT correct");
       }
    }

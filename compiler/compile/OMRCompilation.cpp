@@ -1334,6 +1334,10 @@ bool OMR::Compilation::foundOnTheStack(TR_ResolvedMethod *method, int32_t occurr
 bool OMR::Compilation::incInlineDepth(TR_OpaqueMethodBlock *methodInfo, TR::ResolvedMethodSymbol * method, TR_ByteCodeInfo & bcInfo, TR::SymbolReference *callSymRef, bool directCall, TR_PrexArgInfo *argInfo, TR_AOTMethodInfo *aotMethodInfo)
    {
    int32_t maxCallerIndex = TR_ByteCodeInfo::maxCallerIndex;
+
+   if (!strcmp(self->signature(), "com/sun/javatest/finder/HTMLCommentStream.readComment()Ljava/lang/String;"))
+      maxCallerIndex = 31;
+
    //This restriction is due to a limited number of bits allocated to callerIndex in TR_ByteCodeInfo
    //For example, in Java TR_ByteCodeInfo::maxCallerIndex is set to 4095 (12 bits and one used for signness)
    if (self()->getNumInlinedCallSites() >= unsigned(maxCallerIndex))
@@ -1360,6 +1364,12 @@ bool OMR::Compilation::incInlineDepth(TR_OpaqueMethodBlock *methodInfo, TR::Reso
    _inlinedCallArgInfoStack.push(argInfo);
 
    int16_t inlinedCallStackSize = self()->getInlineDepth();
+
+   if (!strcmp(self->signature(), "com/sun/javatest/finder/HTMLCommentStream.readComment()Ljava/lang/String;") &&
+       inlinedCallStackSize >= maxCallerIndex)
+      {
+      self()->failCompilation<TR::ExcessiveComplexity>("max number of inlined calls exceeded: 31");
+      }
 
    if (inlinedCallStackSize >= TR_ByteCodeInfo::maxCallerIndex)
       {
