@@ -441,7 +441,14 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
                traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (1) guard1 n%dn cold1 block_%d nextBlock block_%d privargIns block_%d runtimeIns block_%d HCRIns block_%d\n", __FUNCTION__,
                   block->getNumber(), originBlock->getNumber(), iteration, guard1->getGlobalIndex(), cold1->getNumber(), nextBlock->getNumber(), privargIns->getNumber(), runtimeIns->getNumber(), HCRIns->getNumber());
 
-               //comp()->getDebug()->verifyCFG(comp()->getMethodSymbol());
+               comp()->getDebug()->verifyCFG(comp()->getMethodSymbol());
+               }
+
+            if (block->nodeIsRemoved() || nextBlock->nodeIsRemoved())
+               {
+               if (trace())
+                  traceMsg(comp(), "%s: DEBUG block block_%d %p or nextBlock block_%d %p has been removed\n", __FUNCTION__, block->getNumber(), block, nextBlock->getNumber(), nextBlock);
+               //break;
                }
 
             if (!(nextBlock->getPredecessors().size() == 1) ||
@@ -552,7 +559,7 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
                      guard1->getGlobalIndex(), cold1->getNumber(), guard2->getGlobalIndex(), guard2Block->getNumber(), cold2->getNumber(),
                      guard2->getBranchDestination()->getNode()->getGlobalIndex(), guard1->getBranchDestination()->getNode()->getGlobalIndex());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (%d) (origin block_%d (%d)): LOOP %d (4.2) guard2Block block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d) cold1 block_%d (%d)\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d [%d] (origin block_%d [%d]): LOOP %d (4.2) guard2Block block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d] cold1 block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), block->nodeIsRemoved(), originBlock->getNumber(), originBlock->nodeIsRemoved(), iteration,
                      guard2Block->getNumber(), guard2Block->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved(),
@@ -571,11 +578,11 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
 
                if (trace())
                   {
-                  traceMsg(comp(), "%s: DEBUG block_%d (%d) (origin block_%d (%d)): LOOP %d (4.3) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d)\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d [%d] (origin block_%d [%d]): LOOP %d (4.3) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), block->nodeIsRemoved(), originBlock->getNumber(), originBlock->nodeIsRemoved(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (4.4) guard2Block block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d) cold1 block_%d (%d)\n\n\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (4.4) guard2Block block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d] cold1 block_%d [%d]\n\n\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      guard2Block->getNumber(), guard2Block->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved(),
@@ -583,6 +590,13 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
 
                   //comp()->getDebug()->verifyCFG(comp()->getMethodSymbol());
                   }
+               }
+
+            if (guard2Block->nodeIsRemoved())
+               {
+               if (trace())
+                  traceMsg(comp(), "%s: DEBUG guard2Block block_%d %p has been removed after changeBranchDestination\n",__FUNCTION__, guard2Block->getNumber(), guard2Block);
+               //break;
                }
 
             if (guard2Tree != guard2Block->getFirstRealTreeTop())
@@ -612,7 +626,7 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
                      if (trace())
                         traceMsg(comp(), "  Moving privarg block_%d after block_%d\n", privargBlock->getNumber(), privargIns->getNumber());
 
-                     moveBlockAfterDest(cfg, privargBlock, privargIns, comp(), trace()));
+                     moveBlockAfterDest(cfg, privargBlock, privargIns, comp(), trace());
 
                      if (HCRIns == privargIns)
                         HCRIns = privargBlock;
@@ -633,16 +647,16 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
 
                if (trace())
                   {
-                  traceMsg(comp(), "%s: DEBUG block_%d (%d) (origin block_%d (%d)): LOOP %d (5.1) [guard1 n%dn cold1 block_%d guard2 n%dn guard2Block block_%d cold2 block_%d] guard2Tree != guard2Block->getFirstRealTreeTop\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d [%d] (origin block_%d [%d]): LOOP %d (5.1) [guard1 n%dn cold1 block_%d guard2 n%dn guard2Block block_%d cold2 block_%d] guard2Tree != guard2Block->getFirstRealTreeTop\n",
                      __FUNCTION__, block->getNumber(), block->nodeIsRemoved(), originBlock->getNumber(), originBlock->nodeIsRemoved(), iteration,
                      guard1->getGlobalIndex(), cold1->getNumber(), guard2->getGlobalIndex(), guard2Block->getNumber(), cold2->getNumber());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.2) privargIns block_%d (%d) runtimeIns block_%d (%d) HCRIns block_%d (%d) guard2Block block_%d (%d)\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.2) privargIns block_%d [%d] runtimeIns block_%d [%d] HCRIns block_%d [%d] guard2Block block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      privargIns->getNumber(), privargIns->nodeIsRemoved(), runtimeIns->getNumber(), runtimeIns->nodeIsRemoved(),
                      HCRIns->getNumber(), HCRIns->nodeIsRemoved(), guard2Block->getNumber(), guard2Block->nodeIsRemoved());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.3) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d) \n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.3) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved());
@@ -660,12 +674,12 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
                   {
                   traceMsg(comp(), "%s: DEBUG Created new block_%d to hold guard2 [%p] n%dn in block_%d\n", __FUNCTION__, guard2Block->getNumber(), guard2, guard2->getGlobalIndex(), guard2Block->getNumber());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.4) privargIns block_%d (%d) runtimeIns block_%d (%d) HCRIns block_%d (%d) guard2Block block_%d (%d)\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.4) privargIns block_%d [%d] runtimeIns block_%d [%d] HCRIns block_%d [%d] guard2Block block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      privargIns->getNumber(), privargIns->nodeIsRemoved(), runtimeIns->getNumber(), runtimeIns->nodeIsRemoved(),
                      HCRIns->getNumber(), HCRIns->nodeIsRemoved(), guard2Block->getNumber(), guard2Block->nodeIsRemoved());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.5) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d) \n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (5.5) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved());
@@ -674,15 +688,15 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
 
             if (trace())
                {
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.1) [guard1 n%dn cold1 block_%d (%d) guard2 n%dn guard2Block block_%d (%d) cold2 block_%d (%d)]\n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.1) guard1 n%dn cold1 block_%d [%d] guard2 n%dn guard2Block block_%d [%d] cold2 block_%d [%d]\n",
                   __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      guard1->getGlobalIndex(), cold1->getNumber(), cold1->nodeIsRemoved(), guard2->getGlobalIndex(), guard2Block->getNumber(), guard2Block->nodeIsRemoved(), cold2->getNumber(), cold2->nodeIsRemoved());
 
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.2) privargIns block_%d (%d) runtimeIns block_%d (%d) HCRIns block_%d (%d)\n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.2) privargIns block_%d [%d] runtimeIns block_%d [%d] HCRIns block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      privargIns->getNumber(), privargIns->nodeIsRemoved(), runtimeIns->getNumber(), runtimeIns->nodeIsRemoved(), HCRIns->getNumber(), HCRIns->nodeIsRemoved());
 
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.3) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d) \n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (6.3) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved());
@@ -704,14 +718,14 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
 
                if (trace())
                   {
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (7.1) [guard1 n%dn cold1 block_%d (%d) guard2 n%dn guard2Block block_%d (%d) cold2 block_%d (%d)]\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (7.1) guard1 n%dn cold1 block_%d [%d] guard2 n%dn guard2Block block_%d [%d] cold2 block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      guard1->getGlobalIndex(), cold1->getNumber(), cold1->nodeIsRemoved(), guard2->getGlobalIndex(), guard2Block->getNumber(), guard2Block->nodeIsRemoved(), cold2->getNumber(), cold2->nodeIsRemoved());
 
                   traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (7.2) Moving guard2 n%dn guard2Block block_%d after block_%d: block has become block_%d\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration, guard2->getGlobalIndex(), guard2Block->getNumber(), insertPoint->getNumber(), block->getNumber());
 
-                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (7.3) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d)\n",
+                  traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (7.3) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved());
@@ -737,16 +751,16 @@ int32_t TR_VirtualGuardHeadMerger::perform() {
                guard2BlockPrev = guard2Block->getPrevBlock();
                guard2BlockSucc = guard2Block->getNextBlock();
 
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.1) [guard1 n%dn cold1 block_%d (%d) guard2 n%dn guard2Block block_%d (%d) cold2 block_%d (%d)]\n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.1) guard1 n%dn cold1 block_%d [%d] guard2 n%dn guard2Block block_%d [%d] cold2 block_%d [%d]\n",
                   __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      guard1->getGlobalIndex(), cold1->getNumber(), cold1->nodeIsRemoved(), guard2->getGlobalIndex(), guard2Block->getNumber(), guard2Block->nodeIsRemoved(), cold2->getNumber(), cold2->nodeIsRemoved());
 
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.2) privargIns block_%d (%d) runtimeIns block_%d (%d) HCRIns block_%d (%d) guard2Block block_%d (%d)\n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.2) privargIns block_%d [%d] runtimeIns block_%d [%d] HCRIns block_%d [%d] guard2Block block_%d [%d]\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      privargIns->getNumber(), privargIns->nodeIsRemoved(), runtimeIns->getNumber(), runtimeIns->nodeIsRemoved(),
                      HCRIns->getNumber(), HCRIns->nodeIsRemoved(), guard2Block->getNumber(), guard2Block->nodeIsRemoved());
 
-               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.3) insertPoint block_%d (%d) insertPointPrev block_%d (%d) insertPointSucc block_%d (%d) guard2BlockPrev block_%d (%d) guard2BlockSucc block_%d (%d)\n\n\n",
+               traceMsg(comp(), "%s: DEBUG block_%d (origin block_%d): LOOP %d (8.3) insertPoint block_%d [%d] insertPointPrev block_%d [%d] insertPointSucc block_%d [%d] guard2BlockPrev block_%d [%d] guard2BlockSucc block_%d [%d]\n\n\n",
                      __FUNCTION__, block->getNumber(), originBlock->getNumber(), iteration,
                      insertPoint->getNumber(), insertPoint->nodeIsRemoved(), insertPointPrev->getNumber(), insertPointPrev->nodeIsRemoved(), insertPointSucc->getNumber(), insertPointSucc->nodeIsRemoved(),
                      guard2BlockPrev->getNumber(), guard2BlockPrev->nodeIsRemoved(), guard2BlockSucc->getNumber(), guard2BlockSucc->nodeIsRemoved());

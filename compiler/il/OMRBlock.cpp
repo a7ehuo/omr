@@ -750,7 +750,7 @@ OMR::Block::changeBranchDestination(TR::TreeTop * newDestination, TR::CFG *cfg, 
 
    if (debugTrace)
       {
-      traceMsg(comp, "  %s: DEBUG 2. prevDestinationTree n%dn block_%d prevDestinationBlock block_%d (%d) -> newDestination n%dn block_%d: prevDestinationBlockPrev block_%d (%d) prevDestinationBlockSucc block_%d (%d)\n",
+      traceMsg(comp, "  %s: DEBUG 2. prevDestinationTree n%dn block_%d prevDestinationBlock block_%d [%d] -> newDestination n%dn block_%d: prevDestinationBlockPrev block_%d [%d] prevDestinationBlockSucc block_%d [%d]\n",
          __FUNCTION__, prevDestinationTree->getNode()->getGlobalIndex(), prevDestinationTree->getEnclosingBlock()->getNumber(),
          prevDestinationBlock ? prevDestinationBlock->getNumber() : -1, prevDestinationBlock ? prevDestinationBlock->nodeIsRemoved() : -1,
          newDestination->getNode()->getGlobalIndex(), newDestination->getEnclosingBlock()->getNumber(), newDestination->getEnclosingBlock()->getNumber(),
@@ -766,7 +766,7 @@ OMR::Block::changeBranchDestination(TR::TreeTop * newDestination, TR::CFG *cfg, 
 
    if (debugTrace)
       {
-      traceMsg(comp, "  %s: DEBUG 3. newDestinationBlock block_%d (%d) newDestinationBlockPrev block_%d (%d) newDestinationBlockSucc block_%d (%d)\n",
+      traceMsg(comp, "  %s: DEBUG 3. newDestinationBlock block_%d [%d] newDestinationBlockPrev block_%d [%d] newDestinationBlockSucc block_%d [%d]\n",
          __FUNCTION__, newDestinationBlock ? newDestinationBlock->getNumber() : -1, newDestinationBlock ? newDestinationBlock->nodeIsRemoved() : -1,
          newDestinationBlockPrev ? newDestinationBlockPrev->getNumber() : -1, newDestinationBlockPrev ? newDestinationBlockPrev->nodeIsRemoved() : -1,
          newDestinationBlockSucc ? newDestinationBlockSucc->getNumber() : -1, newDestinationBlockSucc ? newDestinationBlockSucc->nodeIsRemoved() : -1);
@@ -785,12 +785,12 @@ OMR::Block::changeBranchDestination(TR::TreeTop * newDestination, TR::CFG *cfg, 
       if (debugTrace)
          {
          traceMsg(comp, "  %s: DEBUG 4. current block_%d added edge to %p block_%d\n", __FUNCTION__, self()->getNumber(), newDestinationBlock, newDestinationBlock->getNumber());
-         traceMsg(comp, "  %s: DEBUG 5. prevDestinationBlock block_%d: prevDestinationBlockPrev block_%d prevDestinationBlockSucc block_%d\n",
+         traceMsg(comp, "  %s: DEBUG 5. prevDestinationBlock [%d] block_%d: prevDestinationBlockPrev block_%d [%d] prevDestinationBlockSucc block_%d [%d]\n",
             __FUNCTION__, prevDestinationBlock ? prevDestinationBlock->getNumber() : -1, prevDestinationBlock ? prevDestinationBlock->nodeIsRemoved() : -1,
             prevDestinationBlockPrev ? prevDestinationBlockPrev->getNumber() : -1, prevDestinationBlockPrev ? prevDestinationBlockPrev->nodeIsRemoved() : -1,
             prevDestinationBlockSucc ? prevDestinationBlockSucc->getNumber() : -1, prevDestinationBlockSucc ? prevDestinationBlockSucc->nodeIsRemoved() : -1);
 
-         traceMsg(comp, "  %s: DEBUG 6. newDestinationBlock block_%d newDestinationBlockPrev block_%d newDestinationBlockSucc block_%d\n",
+         traceMsg(comp, "  %s: DEBUG 6. newDestinationBlock block_%d [%d] newDestinationBlockPrev block_%d [%d] newDestinationBlockSucc block_%d [%d]\n",
             __FUNCTION__, newDestinationBlock ? newDestinationBlock->getNumber() : -1, newDestinationBlock ? newDestinationBlock->nodeIsRemoved() : -1,
             newDestinationBlockPrev ? newDestinationBlockPrev->getNumber() : -1, newDestinationBlockPrev ? newDestinationBlockPrev->nodeIsRemoved() : -1,
             newDestinationBlockSucc ? newDestinationBlockSucc->getNumber() : -1, newDestinationBlockSucc ? newDestinationBlockSucc->nodeIsRemoved() : -1);
@@ -809,7 +809,7 @@ OMR::Block::changeBranchDestination(TR::TreeTop * newDestination, TR::CFG *cfg, 
       traceMsg(comp, "  %s: DEBUG 7. current block_%d remove edge block_%d -> block_%d\n", __FUNCTION__, self()->getNumber(), prevEdge->getFrom()->asBlock()->getNumber(), prevEdge->getTo()->asBlock()->getNumber());
 
       //comp->getDebug()->verifyCFG(comp->getMethodSymbol());
-      comp->dumpMethodTrees("Trees before removeEdge in OMR::Block::changeBranchDestination");
+      //comp->dumpMethodTrees("Trees before removeEdge in OMR::Block::changeBranchDestination");
       }
 
    cfg->removeEdge(prevEdge);
@@ -821,12 +821,12 @@ OMR::Block::changeBranchDestination(TR::TreeTop * newDestination, TR::CFG *cfg, 
 
    if (debugTrace)
       {
-      traceMsg(comp, "  %s: DEBUG 8. prevDestinationBlock block_%d: (%d) prevDestinationBlockPrev block_%d (%d) prevDestinationBlockSucc block_%d (%d)\n",
+      traceMsg(comp, "  %s: DEBUG 8. prevDestinationBlock block_%d: [%d] prevDestinationBlockPrev block_%d [%d] prevDestinationBlockSucc block_%d [%d]\n",
          __FUNCTION__, prevDestinationBlock ? prevDestinationBlock->getNumber() : -1, prevDestinationBlock ? prevDestinationBlock->nodeIsRemoved() : -1,
          prevDestinationBlockPrev ? prevDestinationBlockPrev->getNumber() : -1, prevDestinationBlockPrev ? prevDestinationBlockPrev->nodeIsRemoved() : -1,
          prevDestinationBlockSucc ? prevDestinationBlockSucc->getNumber() : -1, prevDestinationBlockSucc ? prevDestinationBlockSucc->nodeIsRemoved() : -1);
 
-      traceMsg(comp, "  %s: DEBUG 9. newDestinationBlock block_%d (%d) newDestinationBlockPrev block_%d (%d) newDestinationBlockSucc block_%d (%d) \n",
+      traceMsg(comp, "  %s: DEBUG 9. newDestinationBlock block_%d [%d] newDestinationBlockPrev block_%d [%d] newDestinationBlockSucc block_%d [%d]\n",
          __FUNCTION__, newDestinationBlock ? newDestinationBlock->getNumber() : -1, newDestinationBlock ? newDestinationBlock->nodeIsRemoved() : -1,
          newDestinationBlockPrev ? newDestinationBlockPrev->getNumber() : -1, newDestinationBlockPrev ? newDestinationBlockPrev->nodeIsRemoved() : -1,
          newDestinationBlockSucc ? newDestinationBlockSucc->getNumber() : -1, newDestinationBlockSucc ? newDestinationBlockSucc->nodeIsRemoved() : -1);
