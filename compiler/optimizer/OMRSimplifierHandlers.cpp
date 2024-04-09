@@ -8453,7 +8453,25 @@ TR::Node *lmulSimplifier(TR::Node * node, TR::Block * block, TR::Simplifier * s)
       {
       firstChildOp = firstChild->getOpCodeValue();
       TR::Node *lrChild = firstChild->getSecondChild();
+
+      bool overflow = false;
+      if (lrChild->getOpCodeValue() == TR::lconst)
+         {
+         int64_t value1 = (lrChild->getLongInt() > 0) ? lrChild->getLongInt() : (-lrChild->getLongInt());
+         value1 = TR::getMaxSigned<TR::Int64>() / value1;
+         int64_t value2 = (secondChild->getLongInt() > 0) ? secondChild->getLongInt() : -secondChild->getLongInt();
+         overflow = (value1 >= value2) ? false : true;
+
+         if (overflow && s->trace())
+            {
+            traceMsg(s->comp(), "%s: node n%dn firstChild n%dn lrChild n%dn %s (%lld 0x%llx) secondChild n%dn (%lld 0x%llx) overflow 1\n", __FUNCTION__,
+               node->getGlobalIndex(), firstChild->getGlobalIndex(), lrChild->getGlobalIndex(), lrChild->getOpCode().getName(), lrChild->getLongInt(), lrChild->getLongInt(),
+                  secondChild->getGlobalIndex(), secondChild->getLongInt(), secondChild->getLongInt());
+             }
+         }
+
       if (lrChild->getOpCodeValue() == TR::lconst &&
+          !overflow &&
           performTransformation(s->comp(), "%sDistributed lmul with lconst over lsub or ladd with lconst in node [" POINTER_PRINTF_FORMAT "]\n", s->optDetailString(), node))
          {
          int64_t product = lrChild->getLongInt() * secondChild->getLongInt();
@@ -8513,8 +8531,26 @@ TR::Node *lmulSimplifier(TR::Node * node, TR::Block * block, TR::Simplifier * s)
          firstChild = firstChild->getFirstChild();
          firstChildOp = firstChild->getOpCodeValue();
          TR::Node *lrChild = firstChild->getSecondChild();
+
+         bool overflow = false;
+         if (lrChild->getOpCodeValue() == TR::iconst)
+            {
+            int64_t value1 = (lrChild->getInt() > 0) ? (int64_t)lrChild->getInt() : (int64_t)(-lrChild->getInt());
+            value1 = TR::getMaxSigned<TR::Int64>() / value1;
+            int64_t value2 = (secondChild->getLongInt() > 0) ? secondChild->getLongInt() : -secondChild->getLongInt();
+            overflow = (value1 >= value2) ? false : true;
+
+            if (overflow && s->trace())
+               {
+               traceMsg(s->comp(), "%s: DEBUG node n%dn firstChild n%dn lrChild n%dn %s (%lld 0x%llx) secondChild n%dn (%lld 0x%llx) overflow 1\n", __FUNCTION__,
+                  node->getGlobalIndex(), firstChild->getGlobalIndex(), lrChild->getGlobalIndex(), lrChild->getOpCode().getName(), lrChild->getInt(), lrChild->getInt(),
+                  secondChild->getGlobalIndex(), secondChild->getLongInt(), secondChild->getLongInt());
+               }
+            }
+
          if (lrChild->getOpCodeValue() == TR::iconst &&
-               performTransformation(s->comp(), "%sDistributed lmul with lconst over isub or iadd of with iconst in node [" POINTER_PRINTF_FORMAT "]\n", s->optDetailString(), node))
+             !overflow &&
+             performTransformation(s->comp(), "%sDistributed lmul with lconst over isub or iadd of with iconst in node [" POINTER_PRINTF_FORMAT "]\n", s->optDetailString(), node))
             {
             int64_t product = (int64_t)lrChild->getInt() * secondChild->getLongInt();
             if (firstChildOp == TR::isub)

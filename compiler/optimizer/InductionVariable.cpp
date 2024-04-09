@@ -2086,6 +2086,17 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
    else if ((node->getOpCodeValue() == TR::imul || node->getOpCodeValue() == TR::ishl) ||
             (node->getOpCodeValue() == TR::lmul || node->getOpCodeValue() == TR::lshl))
       {
+      if (parent &&
+         ((parent->getOpCodeValue() == TR::imul || parent->getOpCodeValue() == TR::ishl) || (parent->getOpCodeValue() == TR::lmul || parent->getOpCodeValue() == TR::lshl)) &&
+         !parent->cannotOverflow())
+         {
+         if (trace())
+            traceMsg(comp(), "%s: loopInvariantBlock block_%d parent n%dn originalNode n%dn node n%dn return seenInductionVariableComputation %d\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), parent->getGlobalIndex(), originalNode ? originalNode->getGlobalIndex() : -1, node->getGlobalIndex(), seenInductionVariableComputation);
+
+         return seenInductionVariableComputation;
+         }
+
       bool shift = node->getOpCodeValue() == TR::ishl ||
                    node->getOpCodeValue() == TR::lshl;
 
