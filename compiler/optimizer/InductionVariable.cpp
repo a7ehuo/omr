@@ -1557,6 +1557,17 @@ TR::Node* TR_LoopStrider::genLoad(TR::Node* node, TR::SymbolReference* symRef, b
 
 void TR_LoopStrider::examineOpCodesForInductionVariableUse(TR::Node* node, TR::Node* parent, int32_t &childNum, int32_t &index, TR::Node* originalNode, TR::Node* replacingNode, TR::Node* linearTerm, TR::Node* mulTerm, TR::SymbolReference **newSymbolReference, TR::Block* loopInvariantBlock, TR::AutomaticSymbol* pinningArrayPointer, int64_t differenceInAdditiveConstants, bool &isInternalPointer, bool &downcastNode, bool &usingAladd)
    {
+   if (trace())
+      {
+      traceMsg(comp(), "\n     %s: DEBUG parent n%dn node n%dn originalNode n%dn replacingNode n%dn linearTerm n%dn mulTerm n%dn\n", __FUNCTION__,
+         parent ? parent->getGlobalIndex() : -1, node->getGlobalIndex(), originalNode ? originalNode->getGlobalIndex() : -1,
+         replacingNode->getGlobalIndex(), linearTerm->getGlobalIndex(), mulTerm->getGlobalIndex());
+
+      traceMsg(comp(), "\n     %s: DEBUG childNum %d index %d newSymbolReference #%d loopInvariantBlock block_%d differenceInAdditiveConstants %lld isInternalPointer %d downcastNode %d usingAladd %d\n", __FUNCTION__,
+         childNum, index, (*newSymbolReference) ? (*newSymbolReference)->getReferenceNumber() : -1, loopInvariantBlock->getNumber(),
+         differenceInAdditiveConstants, isInternalPointer, downcastNode, usingAladd);
+      }
+
    if ((replacingNode->getOpCodeValue() == TR::iload ||
          replacingNode->getOpCodeValue() == TR::lload) &&
          (differenceInAdditiveConstants == 0))
@@ -1852,7 +1863,7 @@ void TR_LoopStrider::examineOpCodesForInductionVariableUse(TR::Node* node, TR::N
          newStoreTreeTop->join(placeHolderTree);
 
          //printf("Reached here in %s\n", comp()->signature());
-         dumpOptDetails(comp(), "\nO^O INDUCTION VARIABLE ANALYSIS: Induction variable analysis inserted initialization tree : %p for new loop invariant symRef #%d\n", newStoreTreeTop->getNode(), newLoopInvariant->getReferenceNumber());
+         dumpOptDetails(comp(), "\nO^O INDUCTION VARIABLE ANALYSIS: Induction variable analysis inserted initialization tree : %p n%dn for new loop invariant symRef #%d\n", newStoreTreeTop->getNode(), newStoreTreeTop->getNode()->getGlobalIndex(), newLoopInvariant->getReferenceNumber());
          int32_t childNum;
          for (childNum=0; childNum < adjustmentNode->getNumChildren(); childNum++)
             adjustmentNode->getChild(childNum)->recursivelyDecReferenceCount();
@@ -1911,6 +1922,16 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
    int32_t internalPointerSymbol = -1;
    TR::AutomaticSymbol *pinningArrayPointer = NULL;
    TR::Node *originalNode = NULL;
+   TR::Node *debugOriginalNode = node;
+
+   if (trace())
+      {
+      if (!parent)
+         traceMsg(comp(), "\n\n----------------------------------\n");
+      traceMsg(comp(), "%s: DEBUG ENTER loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn\n", __FUNCTION__,
+         loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex());
+      }
+
    if (cg()->supportsInternalPointers() &&
        (node->isInternalPointer()) &&
        node->getFirstChild()->getOpCode().isLoadVar() &&
@@ -1948,16 +1969,31 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
          }
       }
 
+   if (trace())
+      traceMsg(comp(), "     %s: DEBUG loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn\n", __FUNCTION__,
+         loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(), node->getGlobalIndex());
+
    // support for TR::aladd
    if ((node->getOpCodeValue() == TR::iadd || node->getOpCodeValue() == TR::isub) ||
        (node->getOpCodeValue() == TR::ladd || node->getOpCodeValue() == TR::lsub))
       {
       if (isExprLoopInvariant(node->getSecondChild()))
          {
+         if (trace())
+            traceMsg(comp(), "     %s: DEBUG loopInvariantBlock block_%d parent n%dn %s cannotOverflow %d childNum %d debugOriginalNode n%dn: node n%dn %s cannotOverflow %d second child is loop invariant\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, parent ? parent->getOpCode().getName() : "-", parent ? parent->cannotOverflow() : -1,
+               childNum, debugOriginalNode->getGlobalIndex(), node->getGlobalIndex(), node->getOpCode().getName(), node->cannotOverflow());
+
          // For TR::aladd's, if the additive constant might exceed INT_MAX; do nothing
          if (usingAladd)
             if (node->getSecondChild()->getLongInt() > INT_MAX)
+               {
+               if (trace())
+                  traceMsg(comp(), "%s: DEBUG EXIT-1 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+                     loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+                     node->getGlobalIndex(), seenInductionVariableComputation);
                return seenInductionVariableComputation;
+               }
 
          if ((node->getFirstChild()->getOpCodeValue() == TR::imul || node->getFirstChild()->getOpCodeValue() == TR::ishl) ||
              (node->getFirstChild()->getOpCodeValue() == TR::lmul || node->getFirstChild()->getOpCodeValue() == TR::lshl))
@@ -1994,6 +2030,11 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
 
             if (replacingNode)
                {
+               if (trace())
+                  traceMsg(comp(), "     %s: DEBUG node n%dn %s firstChild n%dn %s replacingNode n%dn mulTerm n%dn linearTerm n%dn\n", __FUNCTION__,
+                     node->getGlobalIndex(), node->getOpCode().getName(), node->getFirstChild()->getGlobalIndex(), node->getFirstChild()->getOpCode().getName(),
+                     replacingNode->getGlobalIndex(), mulTerm ? mulTerm->getGlobalIndex() : -1, linearTerm ? linearTerm->getGlobalIndex() : -1);
+
                *newSymbolReference = NULL;
                int32_t index = findNewInductionVariable(node, newSymbolReference, true, internalPointerSymbol);
 
@@ -2004,11 +2045,23 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
                       ((comp()->getSymRefTab()->getNumInternalPointers() >= maxInternalPointers()) ||
                        (comp()->cg()->canBeAffectedByStoreTagStalls() &&
                            _numInternalPointerOrPinningArrayTempsInitialized >= MAX_INTERNAL_POINTER_AUTOS_INITIALIZED)))
+                     {
+                     if (trace())
+                        traceMsg(comp(), "%s: DEBUG EXIT-2 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+                           loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+                           node->getGlobalIndex(), seenInductionVariableComputation);
                      return seenInductionVariableComputation;
+                     }
                   else if (!isInternalPointer &&
                            !node->isNonNegative() &&
                            !node->isNonPositive())
+                     {
+                     if (trace())
+                        traceMsg(comp(), "%s: DEBUG EXIT-3 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+                           loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+                           node->getGlobalIndex(), seenInductionVariableComputation);
                      return seenInductionVariableComputation;
+                     }
 
                   canCreateNewSymRef = true;
                   }
@@ -2019,6 +2072,11 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
                   TR_ASSERT(dataType, "dataType cannot be NoType\n");
 
                   *newSymbolReference = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), dataType, isInternalPointer);
+
+                  if (trace())
+                     traceMsg(comp(), "     %s: DEBUG node n%dn %s created newSymbolReference #%d\n", __FUNCTION__,
+                        node->getGlobalIndex(), node->getOpCode().getName(), (*newSymbolReference)->getReferenceNumber());
+
                   if (isInternalPointer && !pinningArrayPointer)
                      {
                      TR::SymbolReference *newPinningArray = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), TR::Address, false);
@@ -2062,10 +2120,9 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
 
                examineOpCodesForInductionVariableUse(node, parent, childNum, index, originalNode, replacingNode, linearTerm, mulTerm, newSymbolReference, loopInvariantBlock, pinningArrayPointer, differenceInAdditiveConstants, isInternalPointer, downcastNode, usingAladd);
 
-
-               dumpOptDetails(comp(), "O^O INDUCTION VARIABLE ANALYSIS: (add/sub) Replaced node : %p "
-                              "to (%s) by load of symbol #%d\n",
-                              node, comp()->getDebug()->getName(node->getOpCodeValue()),
+               dumpOptDetails(comp(), "O^O INDUCTION VARIABLE ANALYSIS: (add/sub) Replaced node : %p n%dn "
+                              "to (%s) by load of symbol #%d\n\n\n",
+                              node, node->getGlobalIndex(), comp()->getDebug()->getName(node->getOpCodeValue()),
                               (*newSymbolReference)->getReferenceNumber());
                }
             }
@@ -2081,11 +2138,38 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
          // where striding can be done.
          //
          TR::Node *replacingNode = findReplacingNode(node, usingAladd, -1);
+
+         if (trace())
+            traceMsg(comp(), "     %s: DEBUG loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn (add/sub) second child NOT loop invariant replacingNode n%dn\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(), node->getGlobalIndex(), replacingNode ? replacingNode->getGlobalIndex() : -1);
          }
       }
    else if ((node->getOpCodeValue() == TR::imul || node->getOpCodeValue() == TR::ishl) ||
             (node->getOpCodeValue() == TR::lmul || node->getOpCodeValue() == TR::lshl))
       {
+      // TODO: how to prevent overflow?
+      // parent (lmul)
+      //   node (lmul)
+      static const char * debugEnableInductionVarialbleFix = feGetEnv("TR_DebugEnableInductionVarialbleFix");
+
+      if (trace())
+         traceMsg(comp(), "     %s: DEBUG loopInvariantBlock block_%d parent n%dn %s cannotOverflow %d childNum %d debugOriginalNode n%dn: node n%dn %s cannotOverflow %d\n", __FUNCTION__,
+            loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, parent ? parent->getOpCode().getName() : "-", parent ? parent->cannotOverflow() : -1,
+            childNum, debugOriginalNode->getGlobalIndex(), node->getGlobalIndex(), node->getOpCode().getName(), node->cannotOverflow());
+
+      if (debugEnableInductionVarialbleFix &&
+          parent &&
+         ((parent->getOpCodeValue() == TR::imul || parent->getOpCodeValue() == TR::ishl) || (parent->getOpCodeValue() == TR::lmul || parent->getOpCodeValue() == TR::lshl)) &&
+         !parent->cannotOverflow())
+         {
+         if (trace())
+            traceMsg(comp(), "%s: DEBUG EXIT-7 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+               node->getGlobalIndex(), seenInductionVariableComputation);
+
+         return seenInductionVariableComputation;
+         }
+
       bool shift = node->getOpCodeValue() == TR::ishl ||
                    node->getOpCodeValue() == TR::lshl;
 
@@ -2117,6 +2201,11 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
 
       if (replacingNode)
          {
+         if (trace())
+            traceMsg(comp(), "     %s: DEBUG node n%dn %s firstChild n%dn %s replacingNode n%dn mulTerm n%dn linearTerm n%dn\n", __FUNCTION__,
+               node->getGlobalIndex(), node->getOpCode().getName(), node->getFirstChild()->getGlobalIndex(), node->getFirstChild()->getOpCode().getName(),
+               replacingNode->getGlobalIndex(), mulTerm ? mulTerm->getGlobalIndex() : -1, linearTerm ? linearTerm->getGlobalIndex() : -1);
+
          *newSymbolReference = NULL;
          int32_t index = findNewInductionVariable(node, newSymbolReference, false, internalPointerSymbol);
 
@@ -2128,11 +2217,23 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
                   ((comp()->getSymRefTab()->getNumInternalPointers() >= maxInternalPointers()) ||
                      (comp()->cg()->canBeAffectedByStoreTagStalls() &&
                      _numInternalPointerOrPinningArrayTempsInitialized >= MAX_INTERNAL_POINTER_AUTOS_INITIALIZED)))
+               {
+               if (trace())
+                  traceMsg(comp(), "%s: DEBUG EXIT-4 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+                     loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+                     node->getGlobalIndex(), seenInductionVariableComputation);
                return seenInductionVariableComputation;
+               }
             else if (!isInternalPointer &&
                      !node->isNonNegative() &&
                      !node->isNonPositive())
+               {
+               if (trace())
+                  traceMsg(comp(), "%s: DEBUG EXIT-5 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+                     loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+                     node->getGlobalIndex(), seenInductionVariableComputation);
                return seenInductionVariableComputation;
+               }
 
             canCreateNewSymRef = true;
             }
@@ -2144,6 +2245,11 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
             TR_ASSERT(dataType, "dataType cannot be TR::NoType\n");
 
             *newSymbolReference = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), dataType, isInternalPointer);
+
+            if (trace())
+               traceMsg(comp(), "     %s: DEBUG node n%dn %s created newSymbolReference #%d\n", __FUNCTION__,
+               node->getGlobalIndex(), node->getOpCode().getName(), (*newSymbolReference)->getReferenceNumber());
+
             if (isInternalPointer && !pinningArrayPointer)
                {
                TR::SymbolReference *newPinningArray = comp()->getSymRefTab()->createTemporary(comp()->getMethodSymbol(), TR::Address, false);
@@ -2175,15 +2281,34 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
          seenInductionVariableComputation = true;
          examineChildren = false;
 
-         int32_t differenceInAdditiveConstants = 0;
-         if (isAdditiveTermConst(index))
-            differenceInAdditiveConstants = (int32_t)(-1*getAdditiveTermConst(index));
+         static const char * debugEnableInductionVarialbleFix2 = feGetEnv("TR_DebugEnableInductionVarialbleFix2");
 
-         examineOpCodesForInductionVariableUse(node, parent, childNum, index, originalNode, replacingNode, linearTerm, mulTerm, newSymbolReference, loopInvariantBlock, pinningArrayPointer, differenceInAdditiveConstants, isInternalPointer, downcastNode, usingAladd);
+         int32_t differenceInAdditiveConstants = 0;
+         int64_t differenceInAdditiveConstantsFix = 0;
+
+         if (trace())
+               traceMsg(comp(), "     %s: DEBUG node n%dn %s index %d isAdditiveTermConst %d\n", __FUNCTION__, node->getGlobalIndex(), node->getOpCode().getName(), index, isAdditiveTermConst(index));
+
+         if (isAdditiveTermConst(index))
+            {
+            differenceInAdditiveConstants = (int32_t)(-1*getAdditiveTermConst(index));
+            differenceInAdditiveConstantsFix = (-1*getAdditiveTermConst(index));
+
+            if (trace())
+               traceMsg(comp(), "     %s: DEBUG node n%dn %s differenceInAdditiveConstants %ld 0x%lx %lld 0x%llx differenceInAdditiveConstantsFix %lld 0x%llx getAdditiveTermConst %lld 0x%llx\n", __FUNCTION__,
+                  node->getGlobalIndex(), node->getOpCode().getName(),
+                  differenceInAdditiveConstants, differenceInAdditiveConstants, (int64_t)differenceInAdditiveConstants, (int64_t)differenceInAdditiveConstants,
+                  differenceInAdditiveConstantsFix, differenceInAdditiveConstantsFix, getAdditiveTermConst(index), getAdditiveTermConst(index));
+            }
+
+         if (debugEnableInductionVarialbleFix2)
+            examineOpCodesForInductionVariableUse(node, parent, childNum, index, originalNode, replacingNode, linearTerm, mulTerm, newSymbolReference, loopInvariantBlock, pinningArrayPointer, differenceInAdditiveConstantsFix, isInternalPointer, downcastNode, usingAladd);
+         else
+            examineOpCodesForInductionVariableUse(node, parent, childNum, index, originalNode, replacingNode, linearTerm, mulTerm, newSymbolReference, loopInvariantBlock, pinningArrayPointer, differenceInAdditiveConstants, isInternalPointer, downcastNode, usingAladd);
 
          dumpOptDetails(comp(), "O^O INDUCTION VARIABLE ANALYSIS: (mul/shl) Replaced node : "
-                        "%p to (%s) by load of symbol #%d\n",
-                        node, comp()->getDebug()->getName(node->getOpCodeValue()),
+                        "%p n%dn to (%s) by load of symbol #%d\n",
+                        node, node->getGlobalIndex(), comp()->getDebug()->getName(node->getOpCodeValue()),
                         (*newSymbolReference)->getReferenceNumber());
          }
       }
@@ -2193,11 +2318,20 @@ bool TR_LoopStrider::examineTreeForInductionVariableUse(TR::Block *loopInvariant
        int32_t i;
        for (i=0;i<node->getNumChildren();i++)
           {
+          if (trace())
+            traceMsg(comp(), "     %s: DEBUG loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn process child %d n%dn\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+               node->getGlobalIndex(), i, node->getChild(i)->getGlobalIndex());
+
           if (examineTreeForInductionVariableUse(loopInvariantBlock, node, i, node->getChild(i), visitCount, newSymbolReference))
              seenInductionVariableComputation = true;
           }
        }
 
+   if (trace())
+      traceMsg(comp(), "%s: DEBUG EXIT-6 loopInvariantBlock block_%d parent n%dn childNum %d debugOriginalNode n%dn: node n%dn seenInductionVariableComputation %d\n\n", __FUNCTION__,
+         loopInvariantBlock->getNumber(), parent ? parent->getGlobalIndex() : -1, childNum, debugOriginalNode->getGlobalIndex(),
+         node->getGlobalIndex(), seenInductionVariableComputation);
    return seenInductionVariableComputation;
    }
 

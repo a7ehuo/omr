@@ -3054,6 +3054,10 @@ bool TR_LoopTransformer::replaceAllInductionVariableComputations(TR::Block *loop
          {
          TR::Node *currentNode = currentTree->getNode();
 
+         if (trace())
+            traceMsg(comp(), "%s: DEBUG ENTER loopInvariantBlock block_%d currentNode n%dn calling examineTreeForInductionVariableUse\n", __FUNCTION__,
+               loopInvariantBlock->getNumber(), currentNode->getGlobalIndex());
+
          if (examineTreeForInductionVariableUse(loopInvariantBlock, NULL, -1, currentNode, comp()->getVisitCount(), newSymbolReference))
             seenInductionVariableComputation = true;
 

@@ -8453,10 +8453,36 @@ TR::Node *lmulSimplifier(TR::Node * node, TR::Block * block, TR::Simplifier * s)
       {
       firstChildOp = firstChild->getOpCodeValue();
       TR::Node *lrChild = firstChild->getSecondChild();
-      if (lrChild->getOpCodeValue() == TR::lconst &&
+
+      bool overflow = false;
+      static const char * debugEnableFixSimplifier = feGetEnv("TR_DebugEnableFixSimplifier");
+
+      if (debugEnableFixSimplifier && lrChild->getOpCodeValue() == TR::lconst)
+         {
+         int64_t value1 = (lrChild->getLongInt() > 0) ? lrChild->getLongInt() : (-lrChild->getLongInt());
+         value1 = TR::getMaxSigned<TR::Int64>() / value1;
+         int64_t value2 = (secondChild->getLongInt() > 0) ? secondChild->getLongInt() : -secondChild->getLongInt();
+         overflow = (value1 >= value2) ? false : true;
+
+         if (s->trace())
+            {
+               traceMsg(s->comp(), "%s: DEBUG node n%dn firstChild n%dn lrChild n%dn %s (%lld 0x%llx) secondChild n%dn (%lld 0x%llx) \n", __FUNCTION__,
+                  node->getGlobalIndex(), firstChild->getGlobalIndex(),
+                  lrChild->getGlobalIndex(), lrChild->getOpCode().getName(), lrChild->getLongInt(), lrChild->getLongInt(),
+                  secondChild->getGlobalIndex(), secondChild->getLongInt(), secondChild->getLongInt());
+               traceMsg(s->comp(), "%s: DEBUG LONG_MAX %lld 0x%llx value1 (%lld 0x%llx) value2 (%lld 0x%llx) overflow %d\n",  __FUNCTION__,
+                  TR::getMaxSigned<TR::Int64>(), TR::getMaxSigned<TR::Int64>(), value1, value1, value2, value2, overflow);
+             }
+         }
+
+      if (lrChild->getOpCodeValue() == TR::lconst && !overflow &&
           performTransformation(s->comp(), "%sDistributed lmul with lconst over lsub or ladd with lconst in node [" POINTER_PRINTF_FORMAT "]\n", s->optDetailString(), node))
          {
          int64_t product = lrChild->getLongInt() * secondChild->getLongInt();
+
+         if (s->trace())
+            traceMsg(s->comp(), "%s: DEBUG product (%lld 0x%llx) \n", __FUNCTION__, product, product);
+
          if (firstChildOp == TR::lsub)
             product = -product;
          TR::Node *productNode = secondChild;
@@ -8513,10 +8539,36 @@ TR::Node *lmulSimplifier(TR::Node * node, TR::Block * block, TR::Simplifier * s)
          firstChild = firstChild->getFirstChild();
          firstChildOp = firstChild->getOpCodeValue();
          TR::Node *lrChild = firstChild->getSecondChild();
-         if (lrChild->getOpCodeValue() == TR::iconst &&
+
+         bool overflow = false;
+         static const char * debugEnableFixSimplifier = feGetEnv("TR_DebugEnableFixSimplifier");
+
+         if (debugEnableFixSimplifier && lrChild->getOpCodeValue() == TR::iconst)
+            {
+            int64_t value1 = (lrChild->getInt() > 0) ? (int64_t)lrChild->getInt() : (int64_t)(-lrChild->getInt());
+            value1 = TR::getMaxSigned<TR::Int64>() / value1;
+            int64_t value2 = (secondChild->getLongInt() > 0) ? secondChild->getLongInt() : -secondChild->getLongInt();
+            overflow = (value1 >= value2) ? false : true;
+
+            if (s->trace())
+               {
+               traceMsg(s->comp(), "%s: DEBUG node n%dn firstChild n%dn lrChild n%dn %s (%lld 0x%llx) secondChild n%dn (%lld 0x%llx)\n", __FUNCTION__,
+                  node->getGlobalIndex(), firstChild->getGlobalIndex(),
+                  lrChild->getGlobalIndex(), lrChild->getOpCode().getName(), lrChild->getInt(), lrChild->getInt(),
+                  secondChild->getGlobalIndex(), secondChild->getLongInt(), secondChild->getLongInt());
+               traceMsg(s->comp(), "%s: DEBUG LONG_MAX %lld 0x%llx value1 (%lld 0x%llx) value2 (%lld 0x%llx) overflow %d\n",  __FUNCTION__,
+                  TR::getMaxSigned<TR::Int64>(), TR::getMaxSigned<TR::Int64>(), value1, value1, value2, value2, overflow);
+               }
+             }
+
+         if (lrChild->getOpCodeValue() == TR::iconst && !overflow &&
                performTransformation(s->comp(), "%sDistributed lmul with lconst over isub or iadd of with iconst in node [" POINTER_PRINTF_FORMAT "]\n", s->optDetailString(), node))
             {
             int64_t product = (int64_t)lrChild->getInt() * secondChild->getLongInt();
+
+            if (s->trace())
+               traceMsg(s->comp(), "%s: DEBUG product (%lld 0x%llx) \n", __FUNCTION__, product, product);
+
             if (firstChildOp == TR::isub)
                product = -product;
             TR::Node *productNode = secondChild;
