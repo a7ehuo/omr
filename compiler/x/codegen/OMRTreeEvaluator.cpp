@@ -50,6 +50,7 @@
 #include "env/ObjectModel.hpp"
 #include "env/TRMemory.hpp"
 #include "env/jittypes.h"
+#include "env/VerboseLog.hpp"
 #include "il/AutomaticSymbol.hpp"
 #include "il/Block.hpp"
 #include "il/DataTypes.hpp"
@@ -2155,6 +2156,10 @@ static void arrayCopyDefault(TR::Node* node, uint8_t elementSize, TR::Register* 
                                                    cg->comp()->target().is64Bit()) ? true : false;
    if (enable8BitPrimitiveArrayCopyEnhancement)
       {
+      if (TR::Options::isAnyVerboseOptionSet())
+         {
+         TR_VerboseLog::writeLineLocked(TR_Vlog_INFO,"arrayCopy8BitPrimitiveEnhancement %s", cg->comp()->signature());
+         }
       arrayCopy8BitPrimitiveEnhancement(node, dstReg, srcReg, sizeReg, cg);
       return;
       }
@@ -2626,7 +2631,13 @@ TR::Register *OMR::X86::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
                                                            cg->comp()->target().is64Bit()) ? true : false;
 
          if (enable16BitPrimitiveArrayCopyEnhancement)
+            {
+            if (TR::Options::isAnyVerboseOptionSet())
+               {
+               TR_VerboseLog::writeLineLocked(TR_Vlog_INFO,"arrayCopy16BitPrimitiveEnhancement %s", cg->comp()->signature());
+               }
             arrayCopy16BitPrimitiveEnhancement(node, dstReg, srcReg, sizeReg, cg);
+            }
          else
             arrayCopy16BitPrimitive(node, dstReg, srcReg, sizeReg, cg);
          }
