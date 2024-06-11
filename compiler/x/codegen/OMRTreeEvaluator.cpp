@@ -1771,6 +1771,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
    generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -8, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/size8Or16Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -1783,6 +1784,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -16, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/size24Or32Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    if (repMovsThresholdBytes == 64)
@@ -1797,6 +1799,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
       generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/size40To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       }
    else // repMovsThresholdBytes = 128
@@ -1813,6 +1816,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
       generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/size40To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
       // ---------------------------------
@@ -1826,6 +1830,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemZmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -64, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemZmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
 
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/size72To128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       }
    }
@@ -1915,6 +1920,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
    generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -4, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size4Or8Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -1925,6 +1931,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
    generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -8, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size12Or16Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -1937,6 +1944,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -16, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size20To32Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    if (repMovsThresholdBytes == 64)
@@ -1951,6 +1959,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
       generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size36To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       }
    else // repMovsThresholdBytes = 128
@@ -1967,6 +1976,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
       generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size36To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
       // ---------------------------------
@@ -1979,7 +1989,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
       generateRegMemInstruction(TR::InstOpCode::VMOVDQUZmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemZmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -64, cg), tmpXmmYmmReg1, cg);
       generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemZmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
-
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/size68To128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       }
    }
@@ -2172,6 +2182,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
    // 2 Bytes
    generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg1, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg1, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/size2Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2184,6 +2195,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
    generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -4, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/size4To8Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2194,6 +2206,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
    generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -8, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/size10To16Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2206,6 +2219,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -16, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/size18To32Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2218,6 +2232,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
    generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/size34To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
    }
 
@@ -2275,6 +2290,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSLargeSizeREPMOVS
       generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
       generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       }
    else // decide direction during runtime
       {
@@ -2290,6 +2306,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSLargeSizeREPMOVS
       generateLabelInstruction(TR::InstOpCode::JAE1, node, mainEndLabel, cg);
       generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, sizeReg, generateX86MemoryReference(srcReg, 0, cg), cg);
       generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), sizeReg, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
 
       {
       TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
@@ -2298,6 +2315,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSLargeSizeREPMOVS
       generateInstruction(TR::InstOpCode::STD, node, cg);
       generateRepMovsInstruction(TR::InstOpCode::REPMOVSW, node, sizeReg, NULL, cg);
       generateInstruction(TR::InstOpCode::CLD, node, cg);
+      cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64BytesBackward", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       og.endOutlinedInstructionSequence();
       }
@@ -2407,6 +2425,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::L1RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S1MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -1, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S1MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size1Or2Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2419,6 +2438,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::L2RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -2, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S2MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size3Or4Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2429,6 +2449,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::L4RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -4, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S4MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size5To8Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2441,6 +2462,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::L8RegMem, node, tmpReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -8, cg), tmpReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::S8MemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size9To6Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2453,6 +2475,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::MOVDQURegMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, sizeReg, 0, -16, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::MOVDQUMemReg, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size17To32Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
 
    // ---------------------------------
@@ -2465,6 +2488,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
    generateRegMemInstruction(TR::InstOpCode::VMOVDQUYmmMem, node, tmpXmmYmmReg2, generateX86MemoryReference(srcReg, 0, cg), cg);
    generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, sizeReg, 0, -32, cg), tmpXmmYmmReg1, cg);
    generateMemRegInstruction(TR::InstOpCode::VMOVDQUMemYmm, node, generateX86MemoryReference(dstReg, 0, cg), tmpXmmYmmReg2, cg);
+   cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/size33To64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
    generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
    }
 
@@ -2564,6 +2588,22 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
    if (node->isForwardArrayCopy())
       {
       generateRepMovsInstruction(repmovs, node, sizeReg, dependencies, cg);
+
+      switch (elementSize)
+         {
+         case 8:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/sizeGreaterThan128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 4:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/sizeGreaterThan128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 2:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         default:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         }
       }
    else // decide direction during runtime
       {
@@ -2574,6 +2614,8 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
       generateRepMovsInstruction(repmovs, node, sizeReg, NULL, cg);
+      if (elementSize == 4)
+         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/sizeGreaterThan128", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
 
       {
       TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
@@ -2582,6 +2624,23 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
       generateInstruction(TR::InstOpCode::STD, node, cg);
       generateRepMovsInstruction(repmovs, node, sizeReg, NULL, cg);
       generateInstruction(TR::InstOpCode::CLD, node, cg);
+
+      switch (elementSize)
+         {
+         case 8:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/sizeGreaterThan128BytesBackward", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 4:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/sizeGreaterThan128BytesBackward", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 2:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64BytesBackward", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         default:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/sizeGreaterThan64BytesBackward", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         }
+
       generateLabelInstruction(TR::InstOpCode::JMP4, node, mainEndLabel, cg);
       og.endOutlinedInstructionSequence();
       }
