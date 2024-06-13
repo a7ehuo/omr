@@ -2614,8 +2614,22 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
       generateRepMovsInstruction(repmovs, node, sizeReg, NULL, cg);
-      if (elementSize == 4)
-         cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/sizeGreaterThan128", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+
+      switch (elementSize)
+         {
+         case 8:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/64bit/(%s)/sizeGreaterThan128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 4:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/32bit/(%s)/sizeGreaterThan128Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         case 2:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/16bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         default:
+            cg->generateDebugCounter(TR::DebugCounter::debugCounterName(cg->comp(), "arraycopy/8bit/(%s)/sizeGreaterThan64Bytes", cg->comp()->signature()), 1, TR::DebugCounter::Undetermined);
+            break;
+         }
 
       {
       TR_OutlinedInstructionsGenerator og(backwardLabel, node, cg);
