@@ -756,6 +756,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"enableOutlinedNew",                 "O\tdo object allocation logic with a fast jit helper",  SET_OPTION_BIT(TR_EnableOutlinedNew), "F"},
    {"enableParanoidRefCountChecks",      "O\tenable extra reference count verification", SET_OPTION_BIT(TR_EnableParanoidRefCountChecks), "F"},
    {"enablePerfAsserts",                 "O\tenable asserts for serious performance problems found during compilation",   SET_OPTION_BIT(TR_EnablePerfAsserts), "F"},
+   {"enablePrimitiveArrayCopyInlineSmallSizeWithoutREPMOVSOriginalThreshold",  "O\tenable array copy original threshold on using rep movs",   SET_OPTION_BIT(TR_EnablePrimitiveArrayCopyInlineSmallSizeWithoutREPMOVSOriginalThreshold), "F"},
    {"enableProfiledDevirtualization",     "O\tenable devirtualization based on interpreter profiling", SET_OPTION_BIT(TR_enableProfiledDevirtualization), "F"},
    {"enableRampupImprovements",           "M\tEnable various changes that improve rampup",    SET_OPTION_BIT(TR_EnableRampupImprovements), "F", NOT_IN_SUBSET},
    {"enableRangeSplittingGRA",            "O\tenable GRA splitting of live ranges to reduce register pressure   ",  SET_OPTION_BIT(TR_EnableRangeSplittingGRA), "F"},
