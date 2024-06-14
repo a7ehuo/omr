@@ -128,6 +128,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
         SET_OPTION_BIT(TR_AOTCompileOnlyFromBootstrap), "F", NOT_IN_SUBSET },
    {"aotrtDebugLevel=", "R<nnn>\tprint aotrt debug output according to level", TR::Options::set32BitNumeric, offsetof(OMR::Options,_newAotrtDebugLevel), 0, "F%d"},
    {"aotSecondRunDetection",  "M\tperform second run detection for AOT", RESET_OPTION_BIT(TR_NoAotSecondRunDetection), "F", NOT_IN_SUBSET},
+   {"arrayCopy32BitPrimitiveRepMovsThreshold=", "O<nnn>\t", TR::Options::set32BitNumeric, offsetof(OMR::Options, _arrayCopy32BitPrimitiveRepMovsThreshold), 0, "F%d" },
    {"assignEveryGlobalRegister", "I\tnever refuse to assign any possible register for GRA in spite of the resulting potential spills", SET_OPTION_BIT(TR_AssignEveryGlobalRegister), "F"},
    {"assumeStartupPhaseUntilToldNotTo", "M\tUse compiler.Command(""endOfStartup"") to exit startup phase",
                  SET_OPTION_BIT(TR_AssumeStartupPhaseUntilToldNotTo), "F" },
@@ -2692,6 +2693,7 @@ OMR::Options::jitPreProcess()
    _inlinerCGColdBorderFrequency = -1;
    _inlinerCGVeryColdBorderFrequency = -1;
    _alwaysWorthInliningThreshold = 15;
+   _arrayCopy32BitPrimitiveRepMovsThreshold = -1;
    _maxLimitedGRACandidates = TR_MAX_LIMITED_GRA_CANDIDATES;
    _maxLimitedGRARegs = TR_MAX_LIMITED_GRA_REGS;
    _counterBucketGranularity = 2;

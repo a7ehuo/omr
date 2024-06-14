@@ -1463,6 +1463,7 @@ public:
       _inlinerCGColdBorderFrequency = 0;
       _inlinerCGVeryColdBorderFrequency = 0;
       _alwaysWorthInliningThreshold = 0;
+      _arrayCopy32BitPrimitiveRepMovsThreshold = 0;
       _initialSCount = 0;
       _enableSCHintFlags = 0;
       _insertGCRTrees = false;
@@ -1820,6 +1821,7 @@ public:
    int32_t getInlinerCGVeryColdBorderFrequency() { return _inlinerCGVeryColdBorderFrequency; }
    void    setInlinerCGVeryColdBorderFrequency(int32_t n) { _inlinerCGVeryColdBorderFrequency = n; }
    int32_t getAlwaysWorthInliningThreshold() const { return _alwaysWorthInliningThreshold; }
+   int32_t getArrayCopy32BitPrimitiveRepMovsThreshold() const { return _arrayCopy32BitPrimitiveRepMovsThreshold; }
    int32_t getMaxLimitedGRACandidates()   { return _maxLimitedGRACandidates; }
    int32_t getMaxLimitedGRARegs()         { return _maxLimitedGRARegs; }
    int32_t getNumLimitedGRARegsWithheld();
@@ -2474,6 +2476,7 @@ protected:
    int32_t                     _inlinerCGColdBorderFrequency;
    int32_t                     _inlinerCGVeryColdBorderFrequency;
    int32_t                     _alwaysWorthInliningThreshold;
+   int32_t                     _arrayCopy32BitPrimitiveRepMovsThreshold;
 
    int32_t                     _initialSCount;
    int32_t                     _enableSCHintFlags;
