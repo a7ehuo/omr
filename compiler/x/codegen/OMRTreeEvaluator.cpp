@@ -2697,7 +2697,7 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
 
    if (node->isForwardArrayCopy())
       {
-      if ((elementSize == 4 || elementSize == 8) && enable32Bit64BitPrimitiveArrayCopyLoop)
+      if ((elementSize == 4 || elementSize == 8) && (repMovsThresholdBytes == 32) && enable32Bit64BitPrimitiveArrayCopyLoop)
          {
          arrayCopy32Bit64BitPrimitiveInlineWithLoop(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, elementSize, mainEndLabel);
          }
@@ -2713,7 +2713,7 @@ static void arrayCopyPrimitiveInlineSmallSizeWithoutREPMOVS(TR::Node* node,
       generateRegMemInstruction(TR::InstOpCode::LEARegMem(), node, dstReg, generateX86MemoryReference(dstReg, srcReg, 0, cg), cg); // dst = dst + src
       generateLabelInstruction(TR::InstOpCode::JB4, node, backwardLabel, cg);   // jb, skip backward copy setup
 
-      if ((elementSize == 4 || elementSize == 8) && enable32Bit64BitPrimitiveArrayCopyLoop)
+      if ((elementSize == 4 || elementSize == 8) && (repMovsThresholdBytes == 32) && enable32Bit64BitPrimitiveArrayCopyLoop)
          {
          arrayCopy32Bit64BitPrimitiveInlineWithLoop(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, tmpReg3, cg, elementSize, mainEndLabel);
          }
@@ -2747,10 +2747,15 @@ static bool enablePrimitiveArrayCopyInlineSmallSizeWithoutREPMOVS(uint8_t elemen
    static bool disable32BitPrimitiveArrayCopyInlineSmallSizeWithoutREPMOVS = feGetEnv("TR_Disable32BitPrimitiveArrayCopyInlineSmallSizeWithoutREPMOVS") != NULL;
    static bool disable64BitPrimitiveArrayCopyInlineSmallSizeWithoutREPMOVS = feGetEnv("TR_Disable64BitPrimitiveArrayCopyInlineSmallSizeWithoutREPMOVS") != NULL;
 
+   static bool enable32Bit64BitPrimitiveArrayRepMovsOriginalThreshold = feGetEnv("TR_Enable32Bit64BitPrimitiveArrayRepMovsOriginalThreshold") != NULL;
+
    bool disableEnhancement = false;
    bool result = false;
 
    threshold = 32;
+
+   if (enable32Bit64BitPrimitiveArrayRepMovsOriginalThreshold && (elementSize == 8 || elementSize == 4))
+      threshold = cg->comp()->target().cpu.supportsFeature(OMR_FEATURE_X86_AVX512F) ? 128 : 64;
 
    switch (elementSize)
       {
