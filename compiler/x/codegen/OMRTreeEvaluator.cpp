@@ -1696,6 +1696,46 @@ static void arrayCopy64BitPrimitiveOnIA32(TR::Node* node, TR::Register* dstReg, 
    cg->stopUsingRegister(scratch);
    }
 
+static void generateTestSourceDestnationCrossPage(TR::Node *node,
+                                                  TR::Register *dstReg,
+                                                  TR::Register *srcReg,
+                                                  TR::Register *sizeReg,
+                                                  TR::Register *tmpReg1,
+                                                  TR::Register *tmpReg2,
+                                                  TR::CodeGenerator *cg,
+                                                  TR::LabelSymbol *repMovsLabel)
+
+   {
+   static bool enable32Bit64BitPrimitiveArrayPageBoundaryCheckSrc = feGetEnv("TR_Enable32Bit64BitPrimitiveArrayPageBoundaryCheckSrc") != NULL;
+   static bool enable32Bit64BitPrimitiveArrayPageBoundaryCheckDst = feGetEnv("TR_Enable32Bit64BitPrimitiveArrayPageBoundaryCheckDst") != NULL;
+
+   if (enable32Bit64BitPrimitiveArrayPageBoundaryCheckSrc)
+      {
+      generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg1, srcReg, cg);
+      generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg2, srcReg, cg);
+      generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, tmpReg2, sizeReg, cg);
+
+      generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, tmpReg1, 0x1000, cg);
+      generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, tmpReg2, 0x1000, cg);
+
+      generateRegRegInstruction(TR::InstOpCode::CMPRegReg(), node, tmpReg1, tmpReg2, cg);
+      generateLabelInstruction(TR::InstOpCode::JNE4, node, repMovsLabel, cg);
+      }
+
+   if (enable32Bit64BitPrimitiveArrayPageBoundaryCheckDst)
+      {
+      generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg1, dstReg, cg);
+      generateRegRegInstruction(TR::InstOpCode::MOVRegReg(), node, tmpReg2, dstReg, cg);
+      generateRegRegInstruction(TR::InstOpCode::ADDRegReg(), node, tmpReg2, sizeReg, cg);
+
+      generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, tmpReg1, 0x1000, cg);
+      generateRegImmInstruction(TR::InstOpCode::ANDRegImm4(), node, tmpReg2, 0x1000, cg);
+
+      generateRegRegInstruction(TR::InstOpCode::CMPRegReg(), node, tmpReg1, tmpReg2, cg);
+      generateLabelInstruction(TR::InstOpCode::JNE4, node, repMovsLabel, cg);
+      }
+   }
+
 void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::Node *node,
                                                                                              TR::Register *dstReg,
                                                                                              TR::Register *srcReg,
@@ -1796,6 +1836,10 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
 
    // ---------------------------------
    generateLabelInstruction(TR::InstOpCode::label, node, copy40ORMoreBytesLabel, cg);
+
+   // Test if the source copy range is across page boundary
+   generateTestSourceDestnationCrossPage(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, cg, repMovsLabel);
+
    generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 64, cg);
 
    generateLabelInstruction(TR::InstOpCode::JA4, node, copyLabel2, cg);
@@ -1943,6 +1987,10 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
 
    // ---------------------------------
    generateLabelInstruction(TR::InstOpCode::label, node, copy36ORMoreBytesLabel, cg);
+
+   // Test if the source copy range is across page boundary
+   generateTestSourceDestnationCrossPage(node, dstReg, srcReg, sizeReg, tmpReg1, tmpReg2, cg, repMovsLabel);
+
    generateRegImmInstruction(TR::InstOpCode::CMPRegImm4(), node, sizeReg, 64, cg);
 
    generateLabelInstruction(TR::InstOpCode::JA4, node, copyLabel2, cg);
