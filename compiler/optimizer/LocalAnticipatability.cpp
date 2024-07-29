@@ -115,10 +115,10 @@ TR_LocalAnticipatability::TR_LocalAnticipatability(TR_LocalAnalysisInfo &info, T
 
       if (trace())
           {
-          traceMsg(comp(), "\nSolution for block number : %d\n", block->getNumber());
-          binfo->_analysisInfo->print(comp());
-          binfo->_downwardExposedAnalysisInfo->print(comp());
-          binfo->_downwardExposedStoreAnalysisInfo->print(comp());
+          traceMsg(comp(), "\n\n%s: Solution for block number : block_%d\n", __FUNCTION__, block->getNumber());
+          traceMsg(comp(), "block_%d _analysisInfo: ", block->getNumber()); binfo->_analysisInfo->print(comp()); traceMsg(comp(), "\n");
+          traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber()); binfo->_downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+          traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber()); binfo->_downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
           }
       }
 
@@ -887,6 +887,7 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
             *tempContainer -= *_seenCallSymbolReferences;
             *tempContainer -= *getCheckSymbolReferences();
             *seenDefinedSymbolReferences |= *tempContainer;
+            if (trace()) traceMsg(comp(), "%s: calling killDownwardExposedExprs 1\n", __FUNCTION__);
             killDownwardExposedExprs(block, tempContainer, node->getFirstChild());
             }
          }
@@ -922,6 +923,7 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
                *tempContainer -= *_seenCallSymbolReferences;
                *tempContainer -= *getCheckSymbolReferences();
                *seenDefinedSymbolReferences |= *tempContainer;
+               if (trace()) traceMsg(comp(), "%s: calling killDownwardExposedExprs 2\n", __FUNCTION__);
                killDownwardExposedExprs(block, tempContainer, node);
                }
             }
@@ -934,6 +936,21 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
             // temp store/load is quite likely as opposed to PPC where a
             // reg store/load is likely.
             //
+            if (trace())
+               {
+               traceMsg(comp(), "\n%s: isStore 1 _registersScarce %d node n%dn node symRef #%d isAutoOrParm %d symReference #%d sharesSymbol %d seenStoredSymbolReferences %d\n",
+                  __FUNCTION__, _registersScarce,
+                  node->getGlobalIndex(),
+                  node->getSymbolReference() ? node->getSymbolReference()->getReferenceNumber() : -1,
+                  node->getSymbolReference() ? node->getSymbolReference()->getSymbol()->isAutoOrParm() : -1,
+                  symReference ? symReference->getReferenceNumber() : -1, symReference ? symReference->sharesSymbol() : -1,
+                  seenStoredSymbolReferences->get(symReference->getReferenceNumber()));
+
+               traceMsg(comp(), "seenStoredSymbolReferences: ");
+               seenStoredSymbolReferences->print(comp());
+               traceMsg(comp(), "\n");
+               }
+
             if (_registersScarce ||
                 (node->getSymbolReference() == comp()->getSymRefTab()->findVftSymbolRef()) ||
                 node->getSymbolReference()->getSymbol()->isAutoOrParm() ||
@@ -962,6 +979,7 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
                  temp->empty();
                  aliases.getAliasesAndUnionWith(*temp);
                  *seenDefinedSymbolReferences |= *temp;
+                 if (trace()) traceMsg(comp(), "%s: calling killDownwardExposedExprs 3\n", __FUNCTION__);
                  killDownwardExposedExprs(block, temp, node);
 
                  if (!bitAlreadySet)
@@ -972,6 +990,7 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
                {
                storeNodes->set(node->getLocalIndex());
                seenStoredSymbolReferences->set(symReference->getReferenceNumber());
+               if (trace()) traceMsg(comp(), "%s: calling killDownwardExposedExprs 4\n", __FUNCTION__);
                killDownwardExposedExprs(block, node);
                }
             }
@@ -986,16 +1005,36 @@ void TR_LocalAnticipatability::updateUsesAndDefs(TR::Node *node, TR::Block *bloc
 
 void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, ContainerType *tempContainer, TR::Node *node)
    {
+   if (trace())
+      {
+      traceMsg(comp(), "%s: block_%d node n%dn li=%d (1) BEGIN \n", __FUNCTION__, block->getNumber(), node ? node->getGlobalIndex() : -1, node ? node->getLocalIndex() : -1);
+      if (tempContainer)
+         {
+         traceMsg(comp(), "block_%d tempContainer: ", block->getNumber()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+         }
+      traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+
+      traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+      }
+
    ContainerType::Cursor iter(*tempContainer);
    bool nodeBitShouldBeOn = false;
    bool storeNodeBitShouldBeOn = false;
    if (node && (node->getLocalIndex() != MAX_SCOUNT))
       {
       if (_info[block->getNumber()]._downwardExposedAnalysisInfo->get(node->getLocalIndex()))
+         {
+         if (trace()) traceMsg(comp(), "%s: block_%d node n%dn nodeBitShouldBeOn 1\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex());
          nodeBitShouldBeOn = true;
+         }
 
       if (_info[block->getNumber()]._downwardExposedStoreAnalysisInfo->get(node->getLocalIndex()))
+         {
+         if (trace()) traceMsg(comp(), "%s: block_%d node n%dn storeNodeBitShouldBeOn 1\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex());
          storeNodeBitShouldBeOn = true;
+         }
       }
 
    *_temp = *(_info[block->getNumber()]._downwardExposedAnalysisInfo);
@@ -1004,8 +1043,21 @@ void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, Contai
       {
       int32_t nextDefinedSymbolReference = iter;
       ContainerType *tinfo = _localTransparency->getTransparencyInfo(nextDefinedSymbolReference);
+
       *(_info[block->getNumber()]._downwardExposedAnalysisInfo) &= *tinfo;
       *(_info[block->getNumber()]._downwardExposedStoreAnalysisInfo) &= *tinfo;
+
+      if (trace())
+         {
+         traceMsg(comp(), "%s: block_%d node n%dn nextDefinedSymbolReference #%d\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex(), nextDefinedSymbolReference);
+         traceMsg(comp(), "TransparencyInfo #%d: ", nextDefinedSymbolReference); tinfo->print(comp()); traceMsg(comp(), "\n");
+
+         traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+         _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+
+         traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+         _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+         }
       }
 
    if (nodeBitShouldBeOn)
@@ -1017,6 +1069,18 @@ void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, Contai
    *_temp -= *(_info[block->getNumber()]._downwardExposedAnalysisInfo);
    *_downwardExposedBeforeButNotAnymore |= *_temp;
 
+   if (trace())
+      {
+      traceMsg(comp(), "%s: block_%d node n%dn END\n", __FUNCTION__, block->getNumber(), node ? node->getGlobalIndex() : -1);
+
+      traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp());
+      traceMsg(comp(), "\n");
+
+      traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp());
+      traceMsg(comp(), "\n");
+      }
    }
 
 
@@ -1024,13 +1088,30 @@ void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, TR::No
    {
    bool nodeBitShouldBeOn = false;
    bool storeNodeBitShouldBeOn = false;
+   if (trace())
+      {
+      traceMsg(comp(), "%s: block_%d node n%dn li=%d (2) BEGIN\n", __FUNCTION__, block->getNumber(), node ? node->getGlobalIndex() : -1, node ? node->getLocalIndex() : -1);
+
+      traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+
+      traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+      }
+
    if (node && (node->getLocalIndex() != MAX_SCOUNT))
       {
       if (_info[block->getNumber()]._downwardExposedAnalysisInfo->get(node->getLocalIndex()))
+         {
+         if (trace()) traceMsg(comp(), "%s: block_%d node n%dn nodeBitShouldBeOn 1\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex());
          nodeBitShouldBeOn = true;
+         }
 
       if (_info[block->getNumber()]._downwardExposedStoreAnalysisInfo->get(node->getLocalIndex()))
-          storeNodeBitShouldBeOn = true;
+         {
+         if (trace()) traceMsg(comp(), "%s: block_%d node n%dn storeNodeBitShouldBeOn 1\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex());
+         storeNodeBitShouldBeOn = true;
+         }
       }
 
    *_temp = *(_info[block->getNumber()]._downwardExposedAnalysisInfo);
@@ -1038,8 +1119,22 @@ void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, TR::No
    if (node->getOpCode().hasSymbolReference())
       {
       ContainerType *tinfo = _localTransparency->getTransparencyInfo(node->getSymbolReference()->getReferenceNumber());
+
       *(_info[block->getNumber()]._downwardExposedAnalysisInfo) &= *tinfo;
       *(_info[block->getNumber()]._downwardExposedStoreAnalysisInfo) &= *tinfo;
+
+      if (trace())
+         {
+         traceMsg(comp(), "%s: block_%d node n%dn node symRef #%d\n", __FUNCTION__, block->getNumber(), node->getGlobalIndex(),
+               node->getSymbolReference()->getReferenceNumber());
+         traceMsg(comp(), "TransparencyInfo #%d: ", node->getSymbolReference()->getReferenceNumber()); tinfo->print(comp()); traceMsg(comp(), "\n");
+
+         traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+         _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+
+         traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+         _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+         }
       }
 
    if (nodeBitShouldBeOn)
@@ -1050,4 +1145,15 @@ void TR_LocalAnticipatability::killDownwardExposedExprs(TR::Block *block, TR::No
 
    *_temp -= *(_info[block->getNumber()]._downwardExposedAnalysisInfo);
    *_downwardExposedBeforeButNotAnymore |= *_temp;
+
+   if (trace())
+      {
+      traceMsg(comp(), "%s: block_%d node n%dn END\n", __FUNCTION__, block->getNumber(), node ? node->getGlobalIndex() : -1);
+
+      traceMsg(comp(), "block_%d _downwardExposedAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+
+      traceMsg(comp(), "block_%d _downwardExposedStoreAnalysisInfo: ", block->getNumber());
+      _info[block->getNumber()]._downwardExposedStoreAnalysisInfo->print(comp()); traceMsg(comp(), "\n");
+      }
    }

@@ -154,6 +154,16 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
       updateUsesAndDefs(currentTree->getNode(), globalDefinedSymbolReferences, definedSymbolReferencesInBlock[blockNumber], storedSymRefsInBlock[blockNumber], symRefsDefinedAfterStoredInBlock[blockNumber], symRefsUsedAfterDefinedInBlock[blockNumber], startVisitCount, tempContainer, temp, allStoredSymRefsInMethod);
 
       currentTree = currentTree->getNextTreeTop();
+
+      if (trace())
+         {
+         traceMsg(comp(), "\n%s: block_%d first pass over the trees to collect symbols that are stored/defined in each block\n", __FUNCTION__, blockNumber);
+         traceMsg(comp(), "globalDefinedSymbolReferences             : "); globalDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "definedSymbolReferencesInBlock[block_%d]  : ", blockNumber); definedSymbolReferencesInBlock[blockNumber]->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "storedSymRefsInBlock[block_%d]            : ", blockNumber); storedSymRefsInBlock[blockNumber]->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "symRefsDefinedAfterStoredInBlock[block_%d]: ", blockNumber); symRefsDefinedAfterStoredInBlock[blockNumber]->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "symRefsUsedAfterDefinedInBlock[block_%d]  : ", blockNumber); symRefsUsedAfterDefinedInBlock[blockNumber]->print(comp()); traceMsg(comp(), "\n");
+         }
       }
 
    // Second pass over the trees; to correspond symbol info collected
@@ -242,6 +252,12 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
         _storedSymbolReferenceNumber = storeSymRef->getReferenceNumber();
         }
 
+      if (trace())
+         {
+         traceMsg(comp(), "%s: block_%d currentNode n%dn _isStoreTree %d _storedSymbolReferenceNumber #%d _isNullCheckTree %d _inNullCheckReferenceSubtree %d _inStoreLhsTree %d\n", __FUNCTION__,
+            blockNumber, currentNode->getGlobalIndex(), _isStoreTree, _storedSymbolReferenceNumber, _isNullCheckTree, _inNullCheckReferenceSubtree, _inStoreLhsTree);
+         }
+
       // Examine nodes that are not stores or checks and
       // kill the expressions that are not transparent because of writes to this symbol.
       //
@@ -303,6 +319,11 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
                      }
                   }
                }
+
+            if (trace())
+               {
+               traceMsg(comp(), "_transparencyInfo[#%d]: ", newDefinedSymbolReference); _transparencyInfo[newDefinedSymbolReference]->print(comp()); traceMsg(comp(), "\n");
+               }
             }
          }
       else if (_checkTree)
@@ -327,6 +348,11 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
                   traceMsg(comp(), "777Expression %d killed (n%dn) by symRef #%d  %d\n", currentNode->getLocalIndex(), currentNode->getGlobalIndex(), newDefinedSymbolReference, true);
 
                _transparencyInfo[newDefinedSymbolReference]->reset(currentNode->getLocalIndex());
+               }
+
+            if (trace())
+               {
+               traceMsg(comp(), "_transparencyInfo[#%d]: ", newDefinedSymbolReference); _transparencyInfo[newDefinedSymbolReference]->print(comp()); traceMsg(comp(), "\n");
                }
             }
          }
@@ -354,7 +380,7 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
       *(_info[nextBlock->getNumber()]._analysisInfo) &= *_supportedNodes;
 
       if (trace())
-         traceMsg(comp(), "\nBeginning to solve for block number : %d\n",nextBlock->getNumber());
+         traceMsg(comp(), "\nBeginning to solve for block number : block_%d\n", nextBlock->getNumber());
 
 
       // We need to kill all expressions dependent on a symbol (other than the load/store) being stored into;
@@ -370,19 +396,19 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
          {
          int32_t nextDefinedSymbolReference = iter;
          if (trace())
-            traceMsg(comp(), "\nUsing transparency info for symRef #%d\n",nextDefinedSymbolReference);
+            traceMsg(comp(), "\nUsing transparency info for symRef #%d\n", nextDefinedSymbolReference);
 
          if (_hasTransparencyInfoFor->get(nextDefinedSymbolReference))
             {
             if (trace())
                {
-               traceMsg(comp(), "\nMerging with : ");
+               traceMsg(comp(), "\nblock_%d Merging with (_transparencyInfo[#%d]): ", nextBlock->getNumber(), nextDefinedSymbolReference);
                _transparencyInfo[nextDefinedSymbolReference]->print(comp());
-               traceMsg(comp(), "\nDefined : ");
+               traceMsg(comp(), "\nblock_%d Defined (definedSymbolReferencesInBlock[block_%d]): ", nextBlock->getNumber(), nextBlock->getNumber());
                definedSymbolReferencesInBlock[nextBlock->getNumber()]->print(comp());
-                traceMsg(comp(), "\nDefined after stored : ");
+               traceMsg(comp(), "\nblock_%d Defined after stored (symRefsDefinedAfterStoredInBlock[block_%d]): ", nextBlock->getNumber(), nextBlock->getNumber());
                symRefsDefinedAfterStoredInBlock[nextBlock->getNumber()]->print(comp());
-                traceMsg(comp(), "\nUsed after defined : ");
+               traceMsg(comp(), "\nblock_%d Used after defined (symRefsUsedAfterDefinedInBlock[block_%d]): ", nextBlock->getNumber(), nextBlock->getNumber());
                symRefsUsedAfterDefinedInBlock[nextBlock->getNumber()]->print(comp());
                traceMsg(comp(), "\n");
                }
@@ -393,6 +419,14 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
             // of the stored value (say o.f) can still survive. All other dependent expressions must be killed
             // though. See discussion above.
             //
+            if (trace())
+               {
+               traceMsg(comp(), "block_%d definedSymbolReferencesInBloc get(#%d) %d symRefsDefinedAfterStoredInBlock get(#%d) %d symRefsUsedAfterDefinedInBlock get(#%d) %d\n",
+                  nextBlock->getNumber(), nextDefinedSymbolReference, definedSymbolReferencesInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference),
+                  nextDefinedSymbolReference, symRefsDefinedAfterStoredInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference),
+                  nextDefinedSymbolReference, symRefsUsedAfterDefinedInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference));
+               }
+
             if (!definedSymbolReferencesInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference) ||
                 (!symRefsDefinedAfterStoredInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference) &&
                  !symRefsUsedAfterDefinedInBlock[nextBlock->getNumber()]->get(nextDefinedSymbolReference)))
@@ -421,27 +455,47 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
                            }
                         else
                            childKilled = true;
+
+                        if (trace())
+                           {
+                           traceMsg(comp(), "block_%d storeNode %d supportedNodesAsArray[storeNode] n%dn storeSymRefNum #%d child n%dn childKilled %d \n", nextBlock->getNumber(),
+                              storeNode, supportedNodesAsArray[storeNode]->getGlobalIndex(), storeSymRefNum, child->getGlobalIndex(), childKilled);
+                           }
                         }
 
-		     TR_BitVector *aliases = NULL;
+		               TR_BitVector *aliases = NULL;
 
                      bool symRefCanSurvive = false;
                      if (storeSymRefNum == nextDefinedSymbolReference)
+                        {
                         symRefCanSurvive = true;
+                        if (trace()) traceMsg(comp(), "block_%d symRefCanSurvive 1 (storeSymRefNum #%d == nextDefinedSymbolReference #%d)\n", nextBlock->getNumber(), storeSymRefNum, nextDefinedSymbolReference);
+                        }
                      else if (supportedNodesAsArray[storeNode]->mayKill(true).contains(nextDefinedSymbolReference, comp()))
                         {
                            {
                            if (!definedSymbolReferencesInBlock[nextBlock->getNumber()]->get(storeSymRefNum) ||
                                (!symRefsDefinedAfterStoredInBlock[nextBlock->getNumber()]->get(storeSymRefNum) &&
                                 !symRefsUsedAfterDefinedInBlock[nextBlock->getNumber()]->get(storeSymRefNum)))
+                              {
                               symRefCanSurvive = true;
+                              if (trace()) traceMsg(comp(), "block_%d symRefCanSurvive 1 (supportedNodesAsArray[storeNode]->mayKill(true).contains(nextDefinedSymbolReference....)\n", nextBlock->getNumber());
+                              }
                            }
                         }
 
-                     if (symRefCanSurvive && !childKilled)
+                     if (trace())
+                        {
+                        traceMsg(comp(), "block_%d storeNode %d supportedNodesAsArray n%dn storeSymRefNum #%d nextDefinedSymbolReference #%d childKilled %d symRefCanSurvive %d\n", nextBlock->getNumber(),
+                           storeNode, supportedNodesAsArray[storeNode]->getGlobalIndex(), storeSymRefNum, nextDefinedSymbolReference, childKilled, symRefCanSurvive);
+                        }
+
+                     static const char *debugDisablesurvivingStoreNodes = feGetEnv("TR_DebugDisablesurvivingStoreNodes");
+
+                     if (symRefCanSurvive && !childKilled && !debugDisablesurvivingStoreNodes)
                         {
                         if (trace())
-                           traceMsg(comp(), "Store node %d survives\n", storeNode);
+                           traceMsg(comp(), "block_%d Store node %d n%dn survives\n", nextBlock->getNumber(), storeNode, supportedNodesAsArray[storeNode]->getGlobalIndex());
 
                         if (survivingStoreNodes->isEmpty())
                            survivingStoreNodes->set(storeNode);
@@ -458,16 +512,36 @@ TR_LocalTransparency::TR_LocalTransparency(TR_LocalAnalysisInfo &info, bool t)
                   }
                }
 
+            if (trace())
+               {
+               traceMsg(comp(), "block_%d _transparencyInfo[#%d]): ", nextBlock->getNumber(), nextDefinedSymbolReference);
+               _transparencyInfo[nextDefinedSymbolReference]->print(comp()); traceMsg(comp(), "\n");
+               traceMsg(comp(), "block_%d survivingStoreNodes: ", nextBlock->getNumber());
+               survivingStoreNodes->print(comp()); traceMsg(comp(), "\n");
+               traceMsg(comp(), "block_%d _analysisInfo: ", nextBlock->getNumber()); _info[nextBlock->getNumber()]._analysisInfo->print(comp()); traceMsg(comp(), "\n");
+               }
+
             *(_info[nextBlock->getNumber()]._analysisInfo) &= *(_transparencyInfo[nextDefinedSymbolReference]);
+
+            if (trace())
+               {
+               traceMsg(comp(), "block_%d _analysisInfo: ", nextBlock->getNumber()); _info[nextBlock->getNumber()]._analysisInfo->print(comp()); traceMsg(comp(), "\n");
+               }
+
             *(_info[nextBlock->getNumber()]._analysisInfo) |= *survivingStoreNodes;
             _info[nextBlock->getNumber()]._analysisInfo->reset(0);
+
+           if (trace())
+              {
+              traceMsg(comp(), "block_%d _analysisInfo: ", nextBlock->getNumber()); _info[nextBlock->getNumber()]._analysisInfo->print(comp()); traceMsg(comp(), "\n");
+              }
             }
          }
 
       if (trace())
           {
-          traceMsg(comp(), "\nSolution for block number : %d\n",nextBlock->getNumber());
-          _info[nextBlock->getNumber()]._analysisInfo->print(comp());
+          traceMsg(comp(), "\n%s: Solution for block number : block_%d\n", __FUNCTION__, nextBlock->getNumber());
+          traceMsg(comp(), "block_%d _analysisInfo: ", nextBlock->getNumber()); _info[nextBlock->getNumber()]._analysisInfo->print(comp()); traceMsg(comp(), "\n");
           }
       }
 
@@ -497,8 +571,47 @@ void TR_LocalTransparency::updateUsesAndDefs(TR::Node *node, ContainerType *glob
    for (i = 0;i < node->getNumChildren();i++)
       updateUsesAndDefs(node->getChild(i), globallySeenDefinedSymbolReferences, seenDefinedSymbolReferences, seenStoredSymRefs, symRefsDefinedAfterStored, symRefsUsedAfterDefined, visitCount, tempContainer, temp, allStoredSymRefsInMethod);
 
-
    TR::ILOpCode &opCode = node->getOpCode();
+
+   if (trace())
+      {
+      traceMsg(comp(), "\n%s: -----------------------------------------------\n", __FUNCTION__);
+      traceMsg(comp(), "%s: node n%dn START opCode %s hasSymbolReference %d\n", __FUNCTION__, node->getGlobalIndex(), opCode.getName(), opCode.hasSymbolReference());
+      if (globallySeenDefinedSymbolReferences)
+         {
+         traceMsg(comp(), "globallySeenDefinedSymbolReferences: "); globallySeenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (seenDefinedSymbolReferences)
+         {
+         traceMsg(comp(), "seenDefinedSymbolReferences: "); seenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (seenStoredSymRefs)
+         {
+         traceMsg(comp(), "seenStoredSymRefs: "); seenStoredSymRefs->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (symRefsDefinedAfterStored)
+         {
+         traceMsg(comp(), "symRefsDefinedAfterStored: "); symRefsDefinedAfterStored->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (symRefsUsedAfterDefined)
+         {
+         traceMsg(comp(), "symRefsUsedAfterDefined: "); symRefsUsedAfterDefined->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (tempContainer)
+         {
+         traceMsg(comp(), "tempContainer: "); tempContainer->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (temp)
+         {
+         traceMsg(comp(), "temp: "); temp->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (allStoredSymRefsInMethod)
+         {
+         traceMsg(comp(), "allStoredSymRefsInMethod: "); allStoredSymRefsInMethod->print(comp()); traceMsg(comp(), "\n");
+         }
+      traceMsg(comp(), "\n");
+      }
+
    if (opCode.hasSymbolReference() &&
        (loadaddrAsLoad() || opCode.getOpCodeValue() != TR::loadaddr))
       {
@@ -572,25 +685,56 @@ void TR_LocalTransparency::updateUsesAndDefs(TR::Node *node, ContainerType *glob
             if (!temp->isEmpty())
                {
                *tempContainer = *temp;
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn FLEX_PRE symRefNum #%d (!opCode.isCheck() && !opCode.isStore()) tempContainer: ",  node->getGlobalIndex(), symRefNum); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn getCheckSymbolReferences: ",  node->getGlobalIndex()); getCheckSymbolReferences()->print(comp()); traceMsg(comp(), "\n");
+                  }
 #else
             tempContainer->empty();
             node->mayKill(true).getAliasesAndUnionWith(*tempContainer);
             if (!tempContainer->isEmpty())
                {
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn symRefNum #%d (!opCode.isCheck() && !opCode.isStore()) tempContainer: ",  node->getGlobalIndex(), symRefNum); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn getCheckSymbolReferences: ",  node->getGlobalIndex()); getCheckSymbolReferences()->print(comp()); traceMsg(comp(), "\n");
+                  }
 #endif
                *tempContainer -= *getCheckSymbolReferences();
+
+               if (trace())
+                 {
+                 traceMsg(comp(), "node n%dn symRefNum #%d tempContainer: ", node->getGlobalIndex(), symRefNum); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                 }
 
                bool pureFunction =  node->getOpCode().isCall() &&
                                     symReference &&
                                     symReference->getSymbol()->castToMethodSymbol() &&
                                     symReference->getSymbol()->castToMethodSymbol()->isPureFunction();
                if (pureFunction)
+                  {
                   tempContainer->reset(symRefNum);
+                  }
+
+              if (trace())
+                 {
+                 traceMsg(comp(), "node n%dn pureFunction %d symRefNum #%d tempContainer: ", node->getGlobalIndex(), pureFunction, symRefNum); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                 }
 
                *seenDefinedSymbolReferences |= *tempContainer;
                *globallySeenDefinedSymbolReferences |= *tempContainer;
                *tempContainer &= *seenStoredSymRefs;
                *symRefsDefinedAfterStored |= *tempContainer;
+
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn seenDefinedSymbolReferences: ",  node->getGlobalIndex()); seenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn globallySeenDefinedSymbolReferences: ",  node->getGlobalIndex()); globallySeenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn tempContainer: ",  node->getGlobalIndex()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn symRefsDefinedAfterStored: ",  node->getGlobalIndex()); symRefsDefinedAfterStored->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "\n");
+                  }
                }
             }
 
@@ -602,6 +746,14 @@ void TR_LocalTransparency::updateUsesAndDefs(TR::Node *node, ContainerType *glob
             // temp store/load is quite likely as opposed to PPC where a
             // reg store/load is likely.
             //
+            if (trace())
+               {
+               traceMsg(comp(), "node n%dn isStore 1 mightHaveVolatileSymbolReference %d _registersScarce %d isAutoOrParm %d sharesSymbol %d symRefNum #%d seenStoredSymRefs %d\n", node->getGlobalIndex(),
+                  node->mightHaveVolatileSymbolReference(), _registersScarce,
+                  node->getSymbolReference()->getSymbol()->isAutoOrParm(), symReference->sharesSymbol(), symRefNum, seenStoredSymRefs->get(symRefNum));
+               traceMsg(comp(), "node n%dn seenStoredSymRefs: ",  node->getGlobalIndex()); seenStoredSymRefs->print(comp()); traceMsg(comp(), "\n");
+               }
+
             if (_registersScarce ||
                 node->getSymbolReference()->getSymbol()->isAutoOrParm() ||
                 symReference->sharesSymbol() ||
@@ -611,6 +763,13 @@ void TR_LocalTransparency::updateUsesAndDefs(TR::Node *node, ContainerType *glob
                   {
                   seenDefinedSymbolReferences->set(symRefNum);
                   symRefsDefinedAfterStored->set(symRefNum);
+
+                  if (trace())
+                     {
+                     traceMsg(comp(), "node n%dn seenDefinedSymbolReferences: ",  node->getGlobalIndex()); seenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+                     traceMsg(comp(), "node n%dn symRefsDefinedAfterStored: ",  node->getGlobalIndex()); symRefsDefinedAfterStored->print(comp()); traceMsg(comp(), "\n");
+                     traceMsg(comp(), "\n");
+                     }
                   }
                }
 
@@ -623,22 +782,97 @@ void TR_LocalTransparency::updateUsesAndDefs(TR::Node *node, ContainerType *glob
             if (!temp->isEmpty())
                {
                *tempContainer = *temp;
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn FLEX_PRE tempContainer: ",  node->getGlobalIndex()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  }
 #else
             tempContainer->empty();
             node->mayKill(true).getAliasesAndUnionWith(*tempContainer);
 
             if (!tempContainer->isEmpty())
                {
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn tempContainer: ",  node->getGlobalIndex()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  }
 #endif
                *globallySeenDefinedSymbolReferences |= *tempContainer;
                tempContainer->reset(symRefNum);
                *seenDefinedSymbolReferences |= *tempContainer;
+
+               if (trace())
+                  {
+                  traceMsg(comp(), "node n%dn tempContainer: ",  node->getGlobalIndex()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn seenDefinedSymbolReferences: ",  node->getGlobalIndex()); seenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "node n%dn globallySeenDefinedSymbolReferences: ",  node->getGlobalIndex()); globallySeenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+                  traceMsg(comp(), "\n");
+                  }
+
+               static const char *debugFixSymRefsDefinedAfterStored1 = feGetEnv("TR_DebugFixSymRefsDefinedAfterStored1");
+               if (debugFixSymRefsDefinedAfterStored1 && node->mightHaveVolatileSymbolReference())
+                  {
+                  *tempContainer &= *seenStoredSymRefs;
+                  *symRefsDefinedAfterStored |= *tempContainer;
+                  if (trace())
+                     {
+                     traceMsg(comp(), "node n%dn mightHaveVolatileSymbolReference 1\n",  node->getGlobalIndex());
+                     traceMsg(comp(), "node n%dn tempContainer: ",  node->getGlobalIndex()); tempContainer->print(comp()); traceMsg(comp(), "\n");
+                     traceMsg(comp(), "node n%dn symRefsDefinedAfterStored: ",  node->getGlobalIndex()); symRefsDefinedAfterStored->print(comp()); traceMsg(comp(), "\n");
+                     traceMsg(comp(), "\n");
+                     }
+                  }
                }
 
             seenStoredSymRefs->set(symRefNum);
             allStoredSymRefsInMethod->set(symRefNum);
+
+            if (trace())
+               {
+               traceMsg(comp(), "node n%dn seenStoredSymRefs: ",  node->getGlobalIndex()); seenStoredSymRefs->print(comp()); traceMsg(comp(), "\n");
+               traceMsg(comp(), "node n%dn allStoredSymRefsInMethod: ",  node->getGlobalIndex()); allStoredSymRefsInMethod->print(comp()); traceMsg(comp(), "\n");
+               traceMsg(comp(), "\n");
+               }
             }
          }
+      }
+
+   if (trace())
+      {
+      traceMsg(comp(), "\n%s: node n%dn END opCode %s\n", __FUNCTION__, node->getGlobalIndex(), opCode.getName());
+      if (globallySeenDefinedSymbolReferences)
+         {
+         traceMsg(comp(), "globallySeenDefinedSymbolReferences: "); globallySeenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (seenDefinedSymbolReferences)
+         {
+         traceMsg(comp(), "seenDefinedSymbolReferences: "); seenDefinedSymbolReferences->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (seenStoredSymRefs)
+         {
+         traceMsg(comp(), "seenStoredSymRefs: "); seenStoredSymRefs->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (symRefsDefinedAfterStored)
+         {
+         traceMsg(comp(), "symRefsDefinedAfterStored: "); symRefsDefinedAfterStored->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (symRefsUsedAfterDefined)
+         {
+         traceMsg(comp(), "symRefsUsedAfterDefined: "); symRefsUsedAfterDefined->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (tempContainer)
+         {
+         traceMsg(comp(), "tempContainer: "); tempContainer->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (temp)
+         {
+         traceMsg(comp(), "temp: "); temp->print(comp()); traceMsg(comp(), "\n");
+         }
+      if (allStoredSymRefsInMethod)
+         {
+         traceMsg(comp(), "allStoredSymRefsInMethod: "); allStoredSymRefsInMethod->print(comp()); traceMsg(comp(), "\n");
+         }
+      traceMsg(comp(), "\n");
       }
    }
 

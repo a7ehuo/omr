@@ -362,13 +362,21 @@ TR_LocalAnalysisInfo::TR_LocalAnalysisInfo(TR::Compilation *c, bool t)
             }
 
          if (!_supportedNodesAsArray[firstNodeInTree->getLocalIndex()])
+            {
+            if (trace())
+               traceMsg(comp(), "%s: _supportedNodesAsArray[%d] = n%dn (2)\n", __FUNCTION__, firstNodeInTree->getLocalIndex(), firstNodeInTree->getGlobalIndex());
             _supportedNodesAsArray[firstNodeInTree->getLocalIndex()] = firstNodeInTree;
+            }
 
          if (opCode->isCheck() &&
              firstNodeInTree->getFirstChild()->getOpCode().isStore() &&
              !firstNodeInTree->getFirstChild()->getSymbolReference()->getSymbol()->isAutoOrParm() &&
              !_supportedNodesAsArray[firstNodeInTree->getFirstChild()->getLocalIndex()])
+            {
+            if (trace())
+               traceMsg(comp(), "%s: _supportedNodesAsArray[%d] = n%dn (3)\n", __FUNCTION__, firstNodeInTree->getFirstChild()->getLocalIndex(), firstNodeInTree->getFirstChild()->getGlobalIndex());
             _supportedNodesAsArray[firstNodeInTree->getFirstChild()->getLocalIndex()] = firstNodeInTree->getFirstChild();
+            }
          }
 
       currentTree = currentTree->getNextTreeTop();
@@ -1055,6 +1063,8 @@ bool TR_LocalAnalysisInfo::collectSupportedNodes(TR::Node *node, TR::Node *paren
 
    if (TR_LocalAnalysis::isSupportedNode(node, _compilation, parent))
       {
+      if (trace())
+         traceMsg(comp(), "%s: _supportedNodesAsArray[%d] = n%dn (1)\n", __FUNCTION__, node->getLocalIndex(), node->getGlobalIndex());
       _supportedNodesAsArray[node->getLocalIndex()] = node;
 
       bool indirectionSafe = true;

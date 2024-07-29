@@ -107,7 +107,7 @@ static void resetChildrensVisitCounts(TR::Node *node, vcount_t count)
    }
 
 #ifdef J9_PROJECT_SPECIFIC
-static void correctDecimalPrecision(TR::Node *store, TR::Node *child, TR::Compilation *comp)
+static void correctDecimalPrecision(TR::Node *store, TR::Node *child, TR::Compilation *comp, bool trace)
    {
    if (child->getType().isBCD() &&
        child->getDecimalPrecision() != store->getDecimalPrecision())
@@ -115,6 +115,7 @@ static void correctDecimalPrecision(TR::Node *store, TR::Node *child, TR::Compil
       TR::ILOpCodes modPrecOp = TR::ILOpCode::modifyPrecisionOpCode(child->getDataType());
       TR_ASSERT(modPrecOp != TR::BadILOp,"no bcd modify precision opcode found\n");
       TR::Node *modPrecNode = TR::Node::create(child, modPrecOp, 1);
+      if (trace) traceMsg(comp, "%s: create modPrecNode n%dn (18)\n", __FUNCTION__, modPrecNode->getGlobalIndex());
       bool isTruncation = store->getDecimalPrecision() < child->getDecimalPrecision();
       if (comp->cg()->traceBCDCodeGen())
          traceMsg(comp,"%screating %s (%p) to correctDecimalPrecision (%d->%d : isTruncation=%s) on node %s (%p)\n", OPT_DETAILS,
@@ -369,10 +370,20 @@ int32_t TR_PartialRedundancy::perform()
       // _isolatedness->copyFromInto(localAnticipatability.getAnalysisInfo(blockStructure->asBlock()->getBlock()->getNumber()), _rednSetInfo[i]);
       *_rednSetInfo[i] = *localAnticipatability.getDownwardExposedAnalysisInfo(blockStructure->asBlock()->getBlock()->getNumber());
 
+      if (trace())
+         {
+         traceMsg(comp(), "\n\nblock_%d _rednSetInfo[%d]: ", i, i); _rednSetInfo[i]->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "block_%d temp: ", i); temp->print(comp()); traceMsg(comp(), "\n");
+         traceMsg(comp(), "block_%d negation: ", i); negation->print(comp()); traceMsg(comp(), "\n");
+         }
       //if (!block->isCold())
          *(_rednSetInfo[i]) &= *negation;
       //else
       //         _rednSetInfo[i]->empty();
+      if (trace())
+         {
+         traceMsg(comp(), "block_%d _rednSetInfo[%d]: ", i, i); _rednSetInfo[i]->print(comp()); traceMsg(comp(), "\n");
+         }
 
       *redundants |= *(_rednSetInfo[i]);
 
@@ -541,6 +552,10 @@ int32_t TR_PartialRedundancy::perform()
                _newSymbols[nextOptimalComputation] = optimalSymRef->getSymbol();
                _newSymbolsMap[nextOptimalComputation] = optimalSymRef->getReferenceNumber();
                _newSymbolReferences[nextOptimalComputation] = optimalSymRef;
+
+               if (trace())
+                  traceMsg(comp(), "%s: 1. nextOptimalComputation %d nextOptimalNode n%dn %p optimalSymRef #%d\n", __FUNCTION__,
+                     nextOptimalComputation, nextOptimalNode->getGlobalIndex(), nextOptimalNode, optimalSymRef->getReferenceNumber());
                }
             else if ((nextOptimalNode->getOpCode().isLoadVarDirect() &&
                       (nextOptimalNode->getSymbol()->isStatic() || nextOptimalNode->getSymbol()->isMethodMetaData())) ||
@@ -576,6 +591,10 @@ int32_t TR_PartialRedundancy::perform()
                _newSymbolsMap[nextOptimalComputation] = newSymbolReference->getReferenceNumber();
                _newSymbolReferences[nextOptimalComputation] = newSymbolReference;
                createdTemp = true;
+
+               if (trace())
+                  traceMsg(comp(), "%s: 2. nextOptimalComputation %d nextOptimalNode n%dn %p newSymbolReference #%d\n", __FUNCTION__,
+                     nextOptimalComputation, nextOptimalNode->getGlobalIndex(), nextOptimalNode, newSymbolReference->getReferenceNumber());
                }
             }
          }
@@ -658,6 +677,9 @@ int32_t TR_PartialRedundancy::perform()
       if (!block->getExceptionPredecessors().empty())
          methodContainsCatchBlocks = true;
 
+      if (trace())
+         traceMsg(comp(), "%s: block_%d _counter %d preIndex %d block entry %p\n", __FUNCTION__, block->getNumber(), _counter, preIndex, block->getEntry());
+ 
       if (block->getEntry() != NULL)
          {
          // Use for debugging
@@ -894,6 +916,9 @@ void TR_PartialRedundancy::processReusedNode(TR::Node *node, TR::ILOpCodes newOp
 
 TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, TR::Node ***supportedNodesAsArray)
    {
+   if (trace())
+      traceMsg(comp(), "%s: block_%d block_%d isEmpty %d\n", __FUNCTION__, block->getNumber(), block->getStructureOf()->getNumber(), _optSetInfo[block->getStructureOf()->getNumber()]->isEmpty());
+
    if (_optSetInfo[block->getStructureOf()->getNumber()]->isEmpty())
       return NULL;
 
@@ -901,7 +926,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
    TR::TreeTop *placeToInsertUnanticipatableOptimalComputations = NULL;
 
    if (trace())
-      traceMsg(comp(), "Placing computations optimally in block number %d\n", block->getStructureOf()->getNumber());
+      traceMsg(comp(), "%s: Placing computations optimally in block_%d\n", __FUNCTION__, block->getStructureOf()->getNumber());
 
    ContainerType *anticipatabilityInfo = _isolatedness->_latestness->_delayedness->_earliestness->_globalAnticipatability->_localAnticipatability.getDownwardExposedAnalysisInfo(block->getNumber());
    int32_t numOptimalElements =_optSetInfo[block->getNumber()]->elementCount();
@@ -915,7 +940,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
       {
       nextOptimalComputation = orderedOptNumbersList[currOptimalElement];
       if (trace())
-         traceMsg(comp(), "Optimal computation %d in block number %d insert after %p\n", nextOptimalComputation, block->getStructureOf()->getNumber(), placeToInsertOptimalComputations->getNode());
+         traceMsg(comp(), "%s: Optimal computation %d in block number %d insert after %p\n", __FUNCTION__, nextOptimalComputation, block->getStructureOf()->getNumber(), placeToInsertOptimalComputations->getNode());
 
       if (_optSetInfo[block->getNumber()]->get(nextOptimalComputation))
          {
@@ -1003,6 +1028,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                                        TR::TransformUtil::fieldShouldBeCompressed(reference, comp()))
                                      {
                                      translateTT = TR::TreeTop::create(comp(), TR::Node::createCompressedRefsAnchor(reference), NULL, NULL);
+                                     if (trace()) traceMsg(comp(), "%s: create reference n%dn (19)\n", __FUNCTION__, reference->getGlobalIndex());
                                     }
                                  }
                                prevTreeTop->join(duplicateOptimalTree);
@@ -1063,6 +1089,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                         				     fe()->dataTypeForLoadOrStore(nextOptimalNode->getDataType()),
                                                              false /* !wantZeroExtension */);
                          convertedOptimalNode = TR::Node::create(conversionOpCode, 1, optimalNode);
+                         if (trace()) traceMsg(comp(), "%s: create convertedOptimalNode n%dn (1)\n", __FUNCTION__, convertedOptimalNode->getGlobalIndex()); 
                          }
 
                       TR::TreeTop *translateTT = NULL;
@@ -1077,14 +1104,16 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                          }
 
                       TR::Node *storeForCommonedNode = TR::Node::createWithSymRef(comp()->il.opCodeForDirectStore(nextOptimalNode->getDataType()), 1, 1, convertedOptimalNode, newSymbolReference);
-
+                      if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (20)\n", __FUNCTION__, storeForCommonedNode->getGlobalIndex());
 #ifdef J9_PROJECT_SPECIFIC
-                      correctDecimalPrecision(storeForCommonedNode, convertedOptimalNode, comp());
+                      correctDecimalPrecision(storeForCommonedNode, convertedOptimalNode, comp(), trace());
 #endif
 
                       TR::TreeTop *duplicateOptimalTree = TR::TreeTop::create(comp(), storeForCommonedNode);
 
-                      //dumpOptDetails(comp(), "%s0Placing %s optimally : %p using symRef #%d\n", OPT_DETAILS, optimalNode->getOpCode().getName(), optimalNode, newSymbolReference->getReferenceNumber());
+                      dumpOptDetails(comp(), "%s0Placing %s optimally : optimalNode n%dn %p using symRef #%d storeForCommonedNode n%dn\n", OPT_DETAILS,
+                        optimalNode->getOpCode().getName(), optimalNode->getGlobalIndex(), optimalNode, newSymbolReference->getReferenceNumber(),
+                        storeForCommonedNode->getGlobalIndex());
 
                       manager()->setAlteredCode(true);
 
@@ -1261,6 +1290,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                      TR::SymbolReference *newSymbolReference = _newSymbolReferences[nullCheckReferenceNode->getLocalIndex()];
                      TR::Node *newLoad = NULL;
                      newLoad = TR::Node::createWithSymRef(nullCheckReferenceNode, comp()->il.opCodeForDirectLoad(nullCheckReferenceDataType), 0, newSymbolReference);
+                     if (trace()) traceMsg(comp(), "%s: create newLoad n%dn (2)\n", __FUNCTION__, newLoad->getGlobalIndex());
                      newLoad->setLocalIndex(-1);
 
                      if (trace())
@@ -1303,6 +1333,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                         TR::TransformUtil::fieldShouldBeCompressed(reference, comp()))
                      {
                      translateTT = TR::TreeTop::create(comp(), TR::Node::createCompressedRefsAnchor(reference), NULL, NULL);
+                     if (trace()) traceMsg(comp(), "%s: create reference n%dn (21)\n", __FUNCTION__, reference->getGlobalIndex());
                      }
                   }
                manager()->setAlteredCode(true);
@@ -1365,6 +1396,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                          TR::TransformUtil::fieldShouldBeCompressed(reference, comp()))
                      {
                      translateTT = TR::TreeTop::create(comp(), TR::Node::createCompressedRefsAnchor(reference), NULL, NULL);
+                     if (trace()) traceMsg(comp(), "%s: create reference n%dn (22)\n", __FUNCTION__, reference->getGlobalIndex());
                      }
                   }
                TR::TreeTop *secondTreeInBlock = placeToInsertOptimalComputations->getNextTreeTop();
@@ -1419,20 +1451,24 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
             TR::ILOpCodes conversionOpCode = TR::ILOpCode::getProperConversion(duplicateOptimalNode->getDataType(), fe()->dataTypeForLoadOrStore(duplicateOptimalNode->getDataType()), false /* !wantZeroExtension */);
             duplicateOptimalNode->setReferenceCount(0);
             convertedOptimalNode = TR::Node::create(conversionOpCode, 1, duplicateOptimalNode);
+            if (trace()) traceMsg(comp(), "%s: create convertedOptimalNode n%dn (3)\n", __FUNCTION__, convertedOptimalNode->getGlobalIndex());
             }
 
          TR::DataType type = nextOptimalNode->getDataType();
          TR::ILOpCodes storeOp = type == TR::NoType ? TR::treetop : comp()->il.opCodeForDirectStore(type);
 
          TR::Node *storeForCommonedNode = TR::Node::createWithSymRef(storeOp, 1, 1, convertedOptimalNode, newSymbolReference);
+         if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (4)\n", __FUNCTION__, storeForCommonedNode->getGlobalIndex());
          convertedOptimalNode->setReferenceCount(1);
 #ifdef J9_PROJECT_SPECIFIC
-         correctDecimalPrecision(storeForCommonedNode, convertedOptimalNode, comp());
+         correctDecimalPrecision(storeForCommonedNode, convertedOptimalNode, comp(), trace());
 #endif
 
          TR::TreeTop *duplicateOptimalTree = TR::TreeTop::create(comp(), storeForCommonedNode);
 
-         dumpOptDetails(comp(), "%s1Placing %s optimally : %p using symRef #%d\n", OPT_DETAILS, convertedOptimalNode->getOpCode().getName(), convertedOptimalNode, newSymbolReference->getReferenceNumber());
+         dumpOptDetails(comp(), "%s1Placing %s optimally : convertedOptimalNode n%dn %p using symRef #%d storeForCommonedNode n%dn\n", OPT_DETAILS,
+            convertedOptimalNode->getOpCode().getName(), convertedOptimalNode->getGlobalIndex(), convertedOptimalNode,
+            newSymbolReference->getReferenceNumber(), storeForCommonedNode->getGlobalIndex());
 
 
          manager()->setAlteredCode(true);
@@ -1453,6 +1489,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                            TR::TransformUtil::fieldShouldBeCompressed(reference->getFirstChild(), comp()))
                   {
                   translateTT = TR::TreeTop::create(comp(), TR::Node::createCompressedRefsAnchor(reference->getFirstChild()), NULL, NULL);
+                  if (trace()) traceMsg(comp(), "%s: create reference n%dn (23)\n", __FUNCTION__, reference->getFirstChild()->getGlobalIndex());
                   placeToInsertOptimalComputations->join(translateTT);
                   translateTT->join(secondTreeInBlock);
                   placeToInsertOptimalComputations = translateTT;
@@ -1462,6 +1499,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
                       TR::TransformUtil::fieldShouldBeCompressed(reference, comp()))
                   {
                   translateTT = TR::TreeTop::create(comp(), TR::Node::createCompressedRefsAnchor(reference), NULL, NULL);
+                  if (trace()) traceMsg(comp(), "%s: create reference n%dn (24)\n", __FUNCTION__, reference->getGlobalIndex());
                   placeToInsertOptimalComputations->join(translateTT);
                   translateTT->join(secondTreeInBlock);
                   placeToInsertOptimalComputations = translateTT;
@@ -1477,6 +1515,7 @@ TR::TreeTop *TR_PartialRedundancy::placeComputationsOptimally(TR::Block *block, 
              duplicateOptimalNode->getSymbol()->castToMethodSymbol()->isPureFunction())
             {
             TR::TreeTop *anchorTT = TR::TreeTop::create(comp(), TR::Node::create(TR::treetop, 1, duplicateOptimalNode), NULL, NULL);
+            if (trace()) traceMsg(comp(), "%s: create duplicateOptimalNode n%dn (25)\n", __FUNCTION__, duplicateOptimalNode->getGlobalIndex());
             placeToInsertOptimalComputations->join(anchorTT);
             anchorTT->join(duplicateOptimalTree);
             }
@@ -1532,12 +1571,29 @@ TR::Node *TR_PartialRedundancy::getAlreadyPresentOptimalNode(TR::Node *node, int
 
 
 
-static bool isExpressionRedundant(TR::Node *node, TR_PartialRedundancy::ContainerType *redundantComputations, TR_PartialRedundancy::ContainerType *anticipatable)
+static bool isExpressionRedundant(TR::Node *node, TR_PartialRedundancy::ContainerType *redundantComputations, TR_PartialRedundancy::ContainerType *anticipatable,
+                                  TR::Compilation *comp = NULL, bool trace = false)
    {
     int32_t preIndex2 = 1000000;
     static char *c1 = feGetEnv("TR_PreIndex2");
     if (c1)
        preIndex2 = atoi(c1);
+
+   if (comp && trace)
+      {
+      int tmpLocalIndex = node->getLocalIndex();
+      traceMsg(comp, "%s: node n%dn %p localIndex %d isStore %d\n", __FUNCTION__, node->getGlobalIndex(), node, tmpLocalIndex, node->getOpCode().isStore());
+      if (redundantComputations)
+         {
+         traceMsg(comp, "%s: localIndex %d %d redundantComputations: ", __FUNCTION__, tmpLocalIndex, redundantComputations->get(tmpLocalIndex));
+         redundantComputations->print(comp); traceMsg(comp, "\n");
+         }
+      if (anticipatable)
+         {
+         traceMsg(comp, "%s: localIndex %d %d anticipatable: ", __FUNCTION__, tmpLocalIndex, anticipatable->get(tmpLocalIndex));
+         anticipatable->print(comp); traceMsg(comp, "\n");
+         }
+      }
 
    if (redundantComputations &&
        node->getLocalIndex() != MAX_SCOUNT &&
@@ -1546,8 +1602,12 @@ static bool isExpressionRedundant(TR::Node *node, TR_PartialRedundancy::Containe
        (node->getOpCode().isStore() || anticipatable->get(node->getLocalIndex())))
      {
      if (node->getLocalIndex() < unsigned(preIndex2))
+        {
+        if (comp && trace) traceMsg(comp, "%s: node n%dn %p localIndex %d return true\n", __FUNCTION__, node->getGlobalIndex(), node, node->getLocalIndex());
         return true;
+        }
      }
+   if (comp && trace) traceMsg(comp, "%s: node n%dn %p localIndex %d return false\n", __FUNCTION__, node->getGlobalIndex(), node, node->getLocalIndex());
    return false;
    }
 
@@ -1566,13 +1626,19 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
    vcount_t visitCount = _visitCount;
 
    if (trace())
-      traceMsg(comp(), "Eliminating redundant computations in block number %d visit count %d\n", block->getStructureOf()->getNumber(), visitCount);
+      traceMsg(comp(), "%s: Eliminating redundant computations in block number block_%d visit count %d\n", __FUNCTION__, block->getStructureOf()->getNumber(), visitCount);
 
    _profilingWalk = true;
    bool walkedTreesAtLeastOnce = false;
 
    ContainerType *redundantComputations = rednSetInfo[block->getStructureOf()->getNumber()];
    ContainerType *anticipatabilityInfo = _isolatedness->_latestness->_delayedness->_earliestness->_globalAnticipatability->_localAnticipatability.getAnalysisInfo(block->getNumber());
+
+   if (trace())
+      {
+      if (redundantComputations) { traceMsg(comp(), "redundantComputations[block_%d]: ", block->getNumber()); redundantComputations->print(comp()); traceMsg(comp(), "\n"); }
+      if (anticipatabilityInfo) { traceMsg(comp(), "anticipatabilityInfo[block_%d]: ", block->getNumber()); anticipatabilityInfo->print(comp()); traceMsg(comp(), "\n"); }
+      }
 
       {
       walkedTreesAtLeastOnce = false;
@@ -1642,6 +1708,15 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
          //
          // Stores could be either treetops themselves or be under a TR::treetop or a null check/resolve check
          //
+#if 0
+         if (trace())
+            {
+            TR::Node *currNode = currentTree->getNode();
+            traceMsg(comp(), "%s: isStore %d isAutoOrParm %d isResolveOrNullCheck %d isAnchor %d\n", __FUNCTION__,
+               firstOpCodeInTree.isStore(), currNode->getSymbolReference()->getSymbol()->isAutoOrParm(),
+               firstOpCodeInTree.isResolveOrNullCheck(), firstOpCodeInTree.isAnchor());
+            }
+#endif 
          if ((firstOpCodeInTree.isStore() &&
               !currentTree->getNode()->getSymbolReference()->getSymbol()->isAutoOrParm()) ||
              ((firstOpCodeInTree.isResolveOrNullCheck() ||
@@ -1653,7 +1728,7 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
             {
             // If this is a redundant expression
             //
-            if (isExpressionRedundant(currentTree->getNode(), redundantComputations, anticipatabilityInfo))
+            if (isExpressionRedundant(currentTree->getNode(), redundantComputations, anticipatabilityInfo, comp(), trace()))
                {
                scount_t nodeIndex = currentTree->getNode()->getLocalIndex();
                TR::Node *redundantNode = supportedNodesAsArray[nodeIndex];
@@ -1699,20 +1774,26 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
                            {
                            TR::ILOpCodes conversionOpCode = TR::ILOpCode::getProperConversion(rhsOfStore->getDataType(), fe()->dataTypeForLoadOrStore(rhsOfStore->getDataType()), false /* !wantZeroExtension */);
                            convertedOptimalNode = TR::Node::create(conversionOpCode, 1, rhsOfStore);
+                           if (trace()) traceMsg(comp(), "%s: create convertedOptimalNode n%dn (5)\n", __FUNCTION__, convertedOptimalNode->getGlobalIndex());
                            }
 
                         storeForCommonedNode = TR::Node::createWithSymRef(opCodeValue, 1, 1, convertedOptimalNode, newSymbolReference);
+                        if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (6) newSymbolReference #%d nodeIndex %d redundantNode n%dn\n", __FUNCTION__,
+                           storeForCommonedNode->getGlobalIndex(), newSymbolReference->getReferenceNumber(), nodeIndex, redundantNode->getGlobalIndex());
                         }
                      else
+                        { 
                         storeForCommonedNode = TR::Node::createWithSymRef(opCodeValue, 1, 1, currentTree->getNode()->getFirstChild(), newSymbolReference);
+                        if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (7)\n", __FUNCTION__, storeForCommonedNode->getGlobalIndex());
+                        }
 #ifdef J9_PROJECT_SPECIFIC
-                     correctDecimalPrecision(storeForCommonedNode, storeForCommonedNode->getFirstChild(), comp());
+                     correctDecimalPrecision(storeForCommonedNode, storeForCommonedNode->getFirstChild(), comp(), trace());
 #endif
 
                      TR::TreeTop *duplicateOptimalTree = TR::TreeTop::create(comp(), storeForCommonedNode);
                      TR::TreeTop *nextTree = currentTree->getNextTreeTop();
 
-                     dumpOptDetails(comp(), "%sEliminating redundant computation (store) : %p\n", OPT_DETAILS, currentTree->getNode());
+                     dumpOptDetails(comp(), "%sEliminating redundant computation (store) : n%dn %p\n", OPT_DETAILS, currentTree->getNode()->getGlobalIndex(), currentTree->getNode());
 
                      if (storeForCommonedNode->getDataType() != TR::Address)
                         optimizer()->setRequestOptimization(OMR::loopVersionerGroup, true);
@@ -1749,20 +1830,25 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
                        {
                        TR::ILOpCodes conversionOpCode = TR::ILOpCode::getProperConversion(rhsOfStore->getDataType(), fe()->dataTypeForLoadOrStore(rhsOfStore->getDataType()), false /* !wantZeroExtension */);
                        convertedOptimalNode = TR::Node::create(conversionOpCode, 1, rhsOfStore);
+                       if (trace()) traceMsg(comp(), "%s: create convertedOptimalNode n%dn (8)\n", __FUNCTION__, convertedOptimalNode->getGlobalIndex());
                        }
 
                     storeForCommonedNode = TR::Node::createWithSymRef(opCodeValue, 1, 1, convertedOptimalNode, newSymbolReference);
+                    if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (9)\n", __FUNCTION__, storeForCommonedNode->getGlobalIndex());
                     }
                  else
+                    {
                     storeForCommonedNode = TR::Node::createWithSymRef(opCodeValue, 1, 1, currentTree->getNode()->getFirstChild()->getFirstChild(), newSymbolReference);
+                    if (trace()) traceMsg(comp(), "%s: create storeForCommonedNode n%dn (10)\n", __FUNCTION__, storeForCommonedNode->getGlobalIndex());
+                    }
 #ifdef J9_PROJECT_SPECIFIC
-                 correctDecimalPrecision(storeForCommonedNode, storeForCommonedNode->getFirstChild(), comp());
+                 correctDecimalPrecision(storeForCommonedNode, storeForCommonedNode->getFirstChild(), comp(), trace());
 #endif
 
                  TR::TreeTop *duplicateOptimalTree = TR::TreeTop::create(comp(), storeForCommonedNode);
                  TR::TreeTop *nextTree = currentTree->getNextTreeTop();
 
-                 dumpOptDetails(comp(), "%sEliminating redundant computation (store) : %p\n", OPT_DETAILS, currentTree->getNode()->getFirstChild());
+                 dumpOptDetails(comp(), "%sEliminating redundant computation (store) : n%dn %p\n", OPT_DETAILS, currentTree->getNode()->getGlobalIndex(), currentTree->getNode()->getFirstChild());
 
                  if (storeForCommonedNode->getDataType() != TR::Address)
                     optimizer()->setRequestOptimization(OMR::loopVersionerGroup, true);
@@ -1815,6 +1901,7 @@ void TR_PartialRedundancy::eliminateRedundantComputations(TR::Block *block, TR::
                      for (nextAnchor = anchorIt.getFirst(); nextAnchor != NULL; nextAnchor = anchorIt.getNext())
                         {
                         TR::TreeTop *anchorTreeTop = TR::TreeTop::create(comp(), TR::Node::create(TR::treetop, 1, nextAnchor));
+                        if (trace()) traceMsg(comp(), "%s: create nextAnchor n%dn (11)\n", __FUNCTION__, nextAnchor->getGlobalIndex());
                         TR::TreeTop *tempPrevTree = currentTree->getPrevTreeTop();
                         anchorTreeTop->join(currentTree);
                         tempPrevTree->join(anchorTreeTop);
@@ -1985,7 +2072,7 @@ bool TR_PartialRedundancy::eliminateRedundantSupportedNodes(TR::Node *parent, TR
           return flag;
 
 
-      if (isExpressionRedundant(node, redundantComputations, anticipatabilityInfo))
+      if (isExpressionRedundant(node, redundantComputations, anticipatabilityInfo, comp(), trace()))
          {
          scount_t nodeIndex = node->getLocalIndex();
          TR::Node *nextRedundantNode = supportedNodesAsArray[nodeIndex];
@@ -2009,6 +2096,7 @@ bool TR_PartialRedundancy::eliminateRedundantSupportedNodes(TR::Node *parent, TR
             for (nextAnchor = anchorIt.getFirst(); nextAnchor != NULL; nextAnchor = anchorIt.getNext())
                {
                TR::TreeTop *anchorTreeTop = TR::TreeTop::create(comp(), TR::Node::create(TR::treetop, 1, nextAnchor));
+               if (trace()) traceMsg(comp(), "%s: create nextAnchor n%dn (12)\n", __FUNCTION__, nextAnchor->getGlobalIndex());
                TR::TreeTop *prevTree = currentTree->getPrevTreeTop();
                anchorTreeTop->join(currentTree);
                prevTree->join(anchorTreeTop);
@@ -2028,7 +2116,9 @@ bool TR_PartialRedundancy::eliminateRedundantSupportedNodes(TR::Node *parent, TR
 
             TR::SymbolReference *newSymbolReference = _newSymbolReferences[nodeIndex];
             if (newSymbolReference &&
-                performTransformation(comp(), "%sEliminating redundant computation (%s) : %p in block_%d, visit count %d\n", OPT_DETAILS, node->getOpCode().getName(), node, blockNum, node->getVisitCount()))
+                performTransformation(comp(), "%sEliminating redundant computation (%s) : n%dn %p in block_%d localIndex %d newSymbolReference #%d visit count %d nextRedundantNode n%dn\n", OPT_DETAILS,
+                  node->getOpCode().getName(), node->getGlobalIndex(), node, blockNum, nodeIndex, newSymbolReference->getReferenceNumber(),
+                  node->getVisitCount(), nextRedundantNode ? nextRedundantNode->getGlobalIndex() : -1))
                {
                if (node->getDataType() == TR::NoType)
                   {
@@ -2043,6 +2133,7 @@ bool TR_PartialRedundancy::eliminateRedundantSupportedNodes(TR::Node *parent, TR
                      if (node->getReferenceCount() > 1)
                         {
                         TR::TreeTop *anchorTreeTop = TR::TreeTop::create(comp(), TR::Node::create(TR::treetop, 1, node));
+                        if (trace()) traceMsg(comp(), "%s: create node n%dn (13)\n", __FUNCTION__, node->getGlobalIndex());
                         TR::TreeTop *prevTree = currentTree->getPrevTreeTop();
                         anchorTreeTop->join(currentTree);
                         prevTree->join(anchorTreeTop);
@@ -2061,7 +2152,7 @@ bool TR_PartialRedundancy::eliminateRedundantSupportedNodes(TR::Node *parent, TR
                         node->getChild(j)->recursivelyDecReferenceCount();
 
                      TR::Node *newLoad = TR::Node::createWithSymRef(node, comp()->il.opCodeForDirectLoad(node->getDataType()), 0, newSymbolReference);
-
+                     if (trace()) traceMsg(comp(), "%s: create newLoad n%dn (14)\n", __FUNCTION__, newLoad->getGlobalIndex());
                      TR::ILOpCodes conversionOpCode = TR::ILOpCode::getProperConversion(newLoad->getDataType(), node->getDataType(), false /* !wantZeroExtension */);
                      if (TR::ILOpCode::isVectorOpCode(conversionOpCode) &&
                          TR::ILOpCode::getVectorOperation(conversionOpCode) == TR::vconv)
@@ -2147,9 +2238,11 @@ TR::TreeTop *TR_PartialRedundancy::replaceOptimalSubNodes(TR::TreeTop *curTree, 
             {
             TR::SymbolReference *newSymbolReference = _newSymbolReferences[node->getLocalIndex()];
             TR::Node *newLoad = TR::Node::createWithSymRef(node, comp()->il.opCodeForDirectLoad(nodeDataType), 0, newSymbolReference);
+            if (trace()) traceMsg(comp(), "%s: create newLoad n%dn (15)\n", __FUNCTION__, newLoad->getGlobalIndex());
             if (fe()->dataTypeForLoadOrStore(node->getDataType()) != node->getDataType())
                newLoad = TR::Node::create(TR::ILOpCode::getProperConversion(newLoad->getDataType(), node->getDataType(), false /* !wantZeroExtension */), 1, newLoad);
 
+            if (trace()) traceMsg(comp(), "%s: create newLoad n%dn (16)\n", __FUNCTION__, newLoad->getGlobalIndex());
             newLoad->setReferenceCount(1);
             newLoad->setLocalIndex(-1);
             duplicateOptimalNode->recursivelyDecReferenceCount();
@@ -2175,6 +2268,7 @@ TR::TreeTop *TR_PartialRedundancy::replaceOptimalSubNodes(TR::TreeTop *curTree, 
             if (node->getOpCode().isCall())
                 {
                 TR::TreeTop *anchorTreeTop = TR::TreeTop::create(comp(), TR::Node::create(TR::treetop, 1, duplicateOptimalNode));
+                if (trace()) traceMsg(comp(), "%s: create duplicateOptimalNode n%dn (17)\n", __FUNCTION__, duplicateOptimalNode->getGlobalIndex());
                 TR::TreeTop *nextTree = curTree->getNextTreeTop();
                 anchorTreeTop->join(nextTree);
                 curTree->join(anchorTreeTop);
