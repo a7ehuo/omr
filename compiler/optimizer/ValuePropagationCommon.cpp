@@ -1324,8 +1324,8 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
           !primitiveArray2 &&
           (copyLen != _constantZeroConstraint)) // Not zero length copy
          {
-         isDstArrayCompTypePrimitiveValueType = isArrayCompTypePrimitiveValueType(dstObject);
-         isSrcArrayCompTypePrimitiveValueType = isArrayCompTypePrimitiveValueType(srcObject);
+         isDstArrayCompTypePrimitiveValueType = isArrayNullRestricted(dstObject);
+         isSrcArrayCompTypePrimitiveValueType = isArrayNullRestricted(srcObject);
 
          switch (isDstArrayCompTypePrimitiveValueType)
             {
