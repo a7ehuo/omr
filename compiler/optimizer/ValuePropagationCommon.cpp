@@ -1311,7 +1311,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 
       static char *disableNullRestrictedArrayCopyXForm = feGetEnv("TR_DisableNullRestrictedArraycopyXForm");
 
-      // JEP 401: If null restricted value type is enabled, we need to preform null check on the value being stored
+      // JEP 401: If null-restricted value type is enabled, we need to preform null check on the value being stored
       // in order to throw a NullPointerException if the array is null-restricted and the value to write is null.
       // If it is this case, System.arraycopy cannot be transformed into arraycopy instructions.
       //
@@ -1436,7 +1436,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          {
          if (trace())
             {
-            comp()->dumpMethodTrees("Trees before modifying for null restricted array check");
+            comp()->dumpMethodTrees("Trees before modifying for null-restricted array check");
             comp()->getDebug()->print(comp()->getOutFile(), comp()->getFlowGraph());
             }
          /*
@@ -1496,6 +1496,9 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          if (trace())
             traceMsg(comp(),"Creating temps for children of the original call node n%dn %p. new call node n%dn %p\n", oldCallNode->getGlobalIndex(), oldCallNode, newCallNode->getGlobalIndex(), newCallNode);
 
+         TR::SymbolReference * dstArrRefSymRef = NULL;
+         TR::SymbolReference * srcArrRefSymRef = NULL;
+
          // Create temporaries for System.arraycopy arguments and replace the children of the new call node with the temps
          for (int32_t i = 0 ; i < oldCallNode->getNumChildren(); ++i)
             {
@@ -1516,10 +1519,17 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                _curTree->insertBefore(savedChildTree);
 
                if (trace())
-                  traceMsg(comp(),"Created child n%dn %p for old child n%dn %p of the original call node\n", savedChildNode->getGlobalIndex(), savedChildNode, child->getGlobalIndex(), child);
+                  traceMsg(comp(),"Created child n%dn %p #%d for old child n%dn %p of the original call node\n", savedChildNode->getGlobalIndex(), savedChildNode, newSymbolReference->getReferenceNumber(),
+                     child->getGlobalIndex(), child);
 
                // Create the child for the new call node with a load of the new sym ref
                value = TR::Node::createLoad(newCallNode, newSymbolReference);
+
+               if (child == dstObjNode)
+                  dstArrRefSymRef = newSymbolReference;
+
+               if (child == srcObjNode)
+                  srcArrRefSymRef = newSymbolReference;
                }
 
             if (trace())
@@ -1539,19 +1549,22 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
             nextTT = nextTT->getNextTreeTop();
 
          if (trace())
-            traceMsg(comp(), "%s: n%dn %p current block_%d slowBlock block_%d newCallTree n%dn %p srcObjNode n%dn %p dstObjNode n%dn %p prevTT n%dn %p nextTT n%dn %p\n",
-               __FUNCTION__, node->getGlobalIndex(), node, _curTree->getEnclosingBlock()->getNumber(), slowBlock->getNumber(),
-               newCallTree->getNode()->getGlobalIndex(), newCallTree->getNode(),
-               srcObjNode->getGlobalIndex(), srcObjNode, dstObjNode->getGlobalIndex(), dstObjNode,
+            {
+            traceMsg(comp(), "%s: n%dn %p current block_%d slowBlock block_%d newCallTree n%dn %p prevTT n%dn %p nextTT n%dn %p\n", __FUNCTION__, node->getGlobalIndex(), node,
+               _curTree->getEnclosingBlock()->getNumber(), slowBlock->getNumber(), newCallTree->getNode()->getGlobalIndex(), newCallTree->getNode(),
                prevTT->getNode()->getGlobalIndex(), prevTT->getNode(), nextTT->getNode()->getGlobalIndex(), nextTT->getNode());
 
-         _needRuntimeTestNullRestrictedArrayCopy.add(new (trStackMemory()) TR_NeedRuntimeTestNullRestrictedArrayCopy(dstObjNode, srcObjNode,
+            traceMsg(comp(), "%s: srcObjNode n%dn %p #%d dstObjNode n%dn %p #%d\n", __FUNCTION__, srcObjNode->getGlobalIndex(), srcObjNode, srcArrRefSymRef->getReferenceNumber(),
+               dstObjNode->getGlobalIndex(), dstObjNode, dstArrRefSymRef->getReferenceNumber());
+            }
+
+         _needRuntimeTestNullRestrictedArrayCopy.add(new (trStackMemory()) TR_NeedRuntimeTestNullRestrictedArrayCopy(dstArrRefSymRef, srcArrRefSymRef,
                                                                                                                      prevTT, nextTT,
                                                                                                                      _curTree->getEnclosingBlock(), slowBlock,
                                                                                                                      needRuntimeTestDstArray));
          if (trace())
             {
-            comp()->dumpMethodTrees("Trees after modifying for null restricted array check");
+            comp()->dumpMethodTrees("Trees after modifying for null-restricted array check");
             comp()->getDebug()->print(comp()->getOutFile(), comp()->getFlowGraph());
             }
          }
@@ -3645,7 +3658,7 @@ void OMR::ValuePropagation::transformNullRestrictedArrayCopy(TR_NeedRuntimeTestN
     *    ================================
     *
     *           Is dstArray primitive VT?
-    *                 (null restricted)
+    *                 (null-restricted)
     *                        |
     *              +---------+---------+
     *              |                   |
@@ -3661,7 +3674,7 @@ void OMR::ValuePropagation::transformNullRestrictedArrayCopy(TR_NeedRuntimeTestN
     *    ================================
     *
     *           Is dstArray primitive VT?
-    *                 (null restricted)
+    *                 (null-restricted)
     *                       |
     *             +---------+---------+
     *             |                   |
@@ -3835,8 +3848,10 @@ slowBlock-> n39n      BBStart <block_10> (freq 0) (cold)
 
    TR_ASSERT_FATAL(needTestSrcArray || needTestDstArray, "needTestSrcArray %d needTestDstArray %d should not both be false\n", needTestSrcArray, needTestDstArray);
 
-   TR::Node *dstArrayRefNode = nullRestrictedArrayCopy->_dstArrayRefNode;
-   TR::Node *srcArrayRefNode = nullRestrictedArrayCopy->_srcArrayRefNode;
+   TR::SymbolReference *dstArrRefSymRef = nullRestrictedArrayCopy->_dstArrRefSymRef;
+   TR::SymbolReference *srcArrRefSymRef = nullRestrictedArrayCopy->_srcArrRefSymRef;
+   TR::Node *dstArrayRefNode = TR::Node::createLoad(dstArrRefSymRef);
+   TR::Node *srcArrayRefNode = TR::Node::createLoad(srcArrRefSymRef);
 
    TR::Block *originBlock = nullRestrictedArrayCopy->_originBlock;
    TR::Block *slowBlock = nullRestrictedArrayCopy->_slowBlock;
@@ -3881,8 +3896,8 @@ slowBlock-> n39n      BBStart <block_10> (freq 0) (cold)
       prevBlock->split(ifDstTree->getNextTreeTop(), cfg, true, true);
       }
 
-   // If destination is not null restricted value type array and array flattening is enabled, we need to check
-   // the source array component type.  If it is null restricted value type, the current arraycopy instructions
+   // If destination is not null-restricted value type array and array flattening is enabled, we need to check
+   // the source array component type.  If it is null-restricted value type, the current arraycopy instructions
    // can't handle copying between flattened and non-flattened arrays.
    if (needTestSrcArray)
       {
