@@ -977,10 +977,10 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 
    bool doRuntimeNullRestrictedTest = false;
    bool needRuntimeTestDstArray = true; // needRuntimeTestDstArray is used only if doRuntimeNullRestrictedTest is true
-   bool areBothArraysFlattenedPrimitiveValueType = false;
+   bool areBothArraysFlattenedNullRestrictedArray = false;
    bool isValueTypeArrayFlatteningEnabled = TR::Compiler->om.isValueTypeArrayFlatteningEnabled();
-   TR_YesNoMaybe isDstArrayCompTypePrimitiveValueType = TR_no;
-   TR_YesNoMaybe isSrcArrayCompTypePrimitiveValueType = TR_no;
+   TR_YesNoMaybe isDstArrayNullRestricted = TR_no;
+   TR_YesNoMaybe isSrcArrayNullRestricted = TR_no;
 
    if (trace() && comp()->generateArraylets())
       traceMsg(comp(), "Detected arraylet arraycopy: %p\n", node);
@@ -1324,14 +1324,14 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
           !primitiveArray2 &&
           (copyLen != _constantZeroConstraint)) // Not zero length copy
          {
-         isDstArrayCompTypePrimitiveValueType = isArrayCompTypePrimitiveValueType(dstObject);
-         isSrcArrayCompTypePrimitiveValueType = isArrayCompTypePrimitiveValueType(srcObject);
+         isDstArrayNullRestricted = isArrayNullRestricted(dstObject);
+         isSrcArrayNullRestricted = isArrayNullRestricted(srcObject);
 
-         switch (isDstArrayCompTypePrimitiveValueType)
+         switch (isDstArrayNullRestricted)
             {
             case TR_yes:
                {
-               if (isSrcArrayCompTypePrimitiveValueType == TR_yes)
+               if (isSrcArrayNullRestricted == TR_yes)
                   {
                   // Array flattening is not enabled
                   //    - If both source and destination arrays are primitive VT, they don't contain
@@ -1356,7 +1356,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                      if ((isArrayElementFlattened(dstObject) == TR_yes) &&
                          (isArrayElementFlattened(srcObject) == TR_yes))
                         {
-                        areBothArraysFlattenedPrimitiveValueType = true;
+                        areBothArraysFlattenedNullRestrictedArray = true;
                         elementSize = TR::Compiler->cls.flattenedArrayElementSize(comp(), dstObject->getClass());
 
                         if (trace())
@@ -1369,7 +1369,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                         }
                      }
                   }
-               else // isSrcArrayCompTypePrimitiveValueType == TR_no or TR_maybe
+               else // isSrcArrayNullRestricted == TR_no or TR_maybe
                   {
                   // The destination is primitive VT array and the source might or might not
                   // be primitive VT array, do not transform because we need to do null store check and
@@ -1385,11 +1385,11 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                doRuntimeNullRestrictedTest = true;
                break;
                }
-            default: // TR_no == isDstArrayCompTypePrimitiveValueType
+            default: // TR_no == isDstArrayNullRestricted
                {
                if (isValueTypeArrayFlatteningEnabled)
                   {
-                  if (isSrcArrayCompTypePrimitiveValueType == TR_yes)
+                  if (isSrcArrayNullRestricted == TR_yes)
                      {
                      if (isArrayElementFlattened(srcObject) == TR_yes)
                         {
@@ -1400,7 +1400,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                         }
                      // else: As long as the source array is not flattened, no need to do anything here
                      }
-                  else if (isSrcArrayCompTypePrimitiveValueType == TR_maybe)
+                  else if (isSrcArrayNullRestricted == TR_maybe)
                      {
                      // The source might or might not be a primitive VT array. If it is primitive VT array that is flattened,
                      // the arraycopy instruction cannot handle copying from flattened array into non-flattened array since the
@@ -1409,7 +1409,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                      // We already know the destination array is identity type. No need to insert runtime test here
                      needRuntimeTestDstArray = false;
                      }
-                  // else: isSrcArrayCompTypePrimitiveValueType == TR_no, both destination and source arrays are
+                  // else: isSrcArrayNullRestricted == TR_no, both destination and source arrays are
                   // identity arrays. No need to do anything here
                   }
                // else: As long as array flattening is not enabled, no need to do anything here
@@ -1419,8 +1419,8 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          }
 
       if (trace())
-         traceMsg(comp(), "%s: n%dn %p transformTheCall %d isSrcArrayCompTypePrimitiveValueType %d isDstArrayCompTypePrimitiveValueType %d doRuntimeNullRestrictedTest %d\n", __FUNCTION__,
-         node->getGlobalIndex(), node, transformTheCall, isSrcArrayCompTypePrimitiveValueType, isDstArrayCompTypePrimitiveValueType, doRuntimeNullRestrictedTest);
+         traceMsg(comp(), "%s: n%dn %p transformTheCall %d isSrcArrayNullRestricted %d isDstArrayNullRestricted %d doRuntimeNullRestrictedTest %d\n", __FUNCTION__,
+         node->getGlobalIndex(), node, transformTheCall, isSrcArrayNullRestricted, isDstArrayNullRestricted, doRuntimeNullRestrictedTest);
       }
 #else
    bool isStringCompressedArrayCopy = false;
@@ -1731,7 +1731,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          else if (srcArrayInfo)
             stride = srcArrayInfo->elementSize();
 
-         stride = areBothArraysFlattenedPrimitiveValueType ? elementSize : stride;
+         stride = areBothArraysFlattenedNullRestrictedArray ? elementSize : stride;
 
          if (stride != 0)
             srcArrayLength->setArrayStride(stride);
@@ -1746,7 +1746,7 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          else if (dstArrayInfo)
             stride = dstArrayInfo->elementSize();
 
-         stride = areBothArraysFlattenedPrimitiveValueType ? elementSize : stride;
+         stride = areBothArraysFlattenedNullRestrictedArray ? elementSize : stride;
 
          if (stride != 0)
             dstArrayLength->setArrayStride(stride);
