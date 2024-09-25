@@ -334,6 +334,10 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
 
    // now do stuff for various kinds of symbols
    //
+   bool trace = comp->getOption(TR_TraceAliases);
+   if (trace)
+      traceMsg(comp, "%s: #%d kind %d\n", __FUNCTION__, self()->getReferenceNumber(), kind);
+
    switch (kind)
       {
       case TR::Symbol::IsMethod:
@@ -440,22 +444,29 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
 #ifdef J9_PROJECT_SPECIFIC
          TR::ResolvedMethodSymbol * resolvedMethodSymbol = _symbol->castToResolvedMethodSymbol();
 
-         if (!comp->getOption(TR_EnableHCR))
+         if (resolvedMethodSymbol->getRecognizedMethod() == TR::java_lang_System_arraycopy)
             {
+            TR_BitVector * aliases = new (aliasRegion) TR_BitVector(bvInitialSize, aliasRegion, growability);
+            *aliases |= symRefTab->aliasBuilder.arrayElementSymRefs();
+            if (comp->generateArraylets())
+               *aliases |= symRefTab->aliasBuilder.arrayletElementSymRefs();
+
+            if (trace)
+               {
+               traceMsg(comp, "%s: 1. arraycopy return aliases: ", __FUNCTION__);
+               if (aliases) aliases->print(comp); traceMsg(comp, "\n");
+               }
+            return aliases;
+            }
+
+         static const char *disableHCRGuards = feGetEnv("TR_DisableHCRGuards");
+         if (!comp->getOption(TR_EnableHCR) || disableHCRGuards)
+            {
+            if (resolvedMethodSymbol->isPureFunction())
+               return NULL;
+
             switch (resolvedMethodSymbol->getRecognizedMethod())
                {
-               case TR::java_lang_System_arraycopy:
-                  {
-                  TR_BitVector * aliases = new (aliasRegion) TR_BitVector(bvInitialSize, aliasRegion, growability);
-                  *aliases |= symRefTab->aliasBuilder.arrayElementSymRefs();
-                  if (comp->generateArraylets())
-                     *aliases |= symRefTab->aliasBuilder.arrayletElementSymRefs();
-                  return aliases;
-                  }
-
-                  if (resolvedMethodSymbol->isPureFunction())
-                      return NULL;
-
                case TR::java_lang_Double_longBitsToDouble:
                case TR::java_lang_Double_doubleToLongBits:
                case TR::java_lang_Float_intBitsToFloat:
@@ -501,9 +512,7 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
                	break;
                }
             }
-#endif //J9_PROJECT_SPECIFIC
 
-#ifdef J9_PROJECT_SPECIFIC
          TR_ResolvedMethod * method = resolvedMethodSymbol->getResolvedMethod();
          TR_PersistentMethodInfo * methodInfo = comp->getRecompilationInfo() ? TR_PersistentMethodInfo::get(method) : NULL;
          if (methodInfo && (methodInfo->hasRefinedAliasSets() ||
@@ -516,7 +525,14 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
                *aliases |= symRefTab->aliasBuilder.gcSafePointSymRefNumbers();
 
             if (methodInfo->doesntKillAnything() && !comp->getOption(TR_DisableRefinedAliases))
+               {
+               if (trace)
+                  {
+                  traceMsg(comp, "%s: 2. return aliases: ", __FUNCTION__);
+                  if (aliases) aliases->print(comp); traceMsg(comp, "\n");
+                  }
                return aliases;
+               }
 
             if ((resolvedMethodSymbol->hasVeryRefinedAliasSets() || comp->getMethodHotness() >= hot) &&
                 !debug("disableVeryRefinedCallAliasSets"))
@@ -534,6 +550,11 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
                   }
                if (exactAliases)
                   {
+                  if (trace)
+                     {
+                     traceMsg(comp, "%s: 3. return aliases: ", __FUNCTION__);
+                     exactAliases->print(comp); traceMsg(comp, "\n");
+                     }
                   return exactAliases;
                   }
                }
@@ -602,9 +623,21 @@ OMR::SymbolReference::getUseDefAliasesBV(bool isDirectCall, bool includeGCSafePo
 
             TR_BitVector *methodAliases = symRefTab->aliasBuilder.methodAliases(self());
             *aliases &= *methodAliases;
+
+            if (trace)
+               {
+               traceMsg(comp, "%s: 4. return aliases: ", __FUNCTION__);
+               if (aliases) aliases->print(comp); traceMsg(comp, "\n");
+               }
             return aliases;
             }
-#endif
+#endif  //J9_PROJECT_SPECIFIC
+
+         if (trace)
+            {
+            traceMsg(comp, "%s: %d java_lang_System_arraycopy=%d 5. return aliases: ", __FUNCTION__, resolvedMethodSymbol->getRecognizedMethod(), TR::java_lang_System_arraycopy);
+            if (symRefTab->aliasBuilder.methodAliases(self())) symRefTab->aliasBuilder.methodAliases(self())->print(comp); traceMsg(comp, " -- \n");
+            }
 
          return symRefTab->aliasBuilder.methodAliases(self());
          }
