@@ -1717,6 +1717,7 @@ void OMR::X86::TreeEvaluator::arrayCopy64BitPrimitiveInlineSmallSizeWithoutREPMO
          cg->comp()->getDebug()->getName(sizeReg), repMovsThresholdBytes);
       }
 
+   if (cg->comp()->getOptions()->isAnyVerboseOptionSet()) TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: repMovsThresholdBytes %d %s\n", __FUNCTION__, repMovsThresholdBytes, cg->comp()->signature());
    TR_ASSERT_FATAL((repMovsThresholdBytes == 32) || (repMovsThresholdBytes == 64) || (repMovsThresholdBytes == 128),
       "%s: repMovsThresholdBytes %d is not supported\n", __FUNCTION__, repMovsThresholdBytes);
 
@@ -1844,6 +1845,7 @@ void OMR::X86::TreeEvaluator::arrayCopy32BitPrimitiveInlineSmallSizeWithoutREPMO
          cg->comp()->getDebug()->getName(sizeReg), repMovsThresholdBytes);
       }
 
+   if (cg->comp()->getOptions()->isAnyVerboseOptionSet()) TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: repMovsThresholdBytes %d %s\n", __FUNCTION__, repMovsThresholdBytes, cg->comp()->signature());
    TR_ASSERT_FATAL((repMovsThresholdBytes == 32) || (repMovsThresholdBytes == 64) || (repMovsThresholdBytes == 128),
       "%s: repMovsThresholdBytes %d is not supported\n", __FUNCTION__, repMovsThresholdBytes);
 
@@ -2081,6 +2083,7 @@ static void arrayCopy16BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot16(TR::N
          node->getGlobalIndex(), cg->comp()->getDebug()->getName(srcReg), cg->comp()->getDebug()->getName(dstReg), cg->comp()->getDebug()->getName(sizeReg), repMovsThresholdBytes);
       }
 
+   if (cg->comp()->getOptions()->isAnyVerboseOptionSet()) TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: repMovsThresholdBytes %d %s\n", __FUNCTION__, repMovsThresholdBytes, cg->comp()->signature());
    TR_ASSERT_FATAL((repMovsThresholdBytes == 32) || (repMovsThresholdBytes == 64), "%s: repMovsThresholdBytes %d is not supported\n", __FUNCTION__, repMovsThresholdBytes);
 
    /*
@@ -2329,6 +2332,7 @@ static void arrayCopy8BitPrimitiveInlineSmallSizeWithoutREPMOVSImplRoot8(TR::Nod
          cg->comp()->getDebug()->getName(sizeReg), repMovsThresholdBytes);
       }
 
+   if (cg->comp()->getOptions()->isAnyVerboseOptionSet()) TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: repMovsThresholdBytes %d %s\n", __FUNCTION__, repMovsThresholdBytes, cg->comp()->signature());
    TR_ASSERT_FATAL((repMovsThresholdBytes == 32) || (repMovsThresholdBytes == 64), "%s: repMovsThresholdBytes %d is not supported\n", __FUNCTION__, repMovsThresholdBytes);
 
    /*
