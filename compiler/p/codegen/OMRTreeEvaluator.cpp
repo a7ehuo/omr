@@ -2978,7 +2978,7 @@ TR::Register *OMR::Power::TreeEvaluator::bstoreEvaluator(TR::Node *node, TR::Cod
    return NULL;
    }
 
-// also handles isstore
+// also handles sstorei
 TR::Register *OMR::Power::TreeEvaluator::sstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg)
    {
    TR::Node *valueChild;

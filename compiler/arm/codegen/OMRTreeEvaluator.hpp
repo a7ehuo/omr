@@ -560,8 +560,6 @@ public:
    static TR::Register *bstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *sstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *ilstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg);
-   static TR::Register *ifstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg);
-   static TR::Register *idstoreEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *gotoEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *ireturnEvaluator(TR::Node *node, TR::CodeGenerator *cg);
    static TR::Register *lreturnEvaluator(TR::Node *node, TR::CodeGenerator *cg);
