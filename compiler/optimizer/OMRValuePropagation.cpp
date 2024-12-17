@@ -7247,6 +7247,16 @@ bool OMR::ValuePropagation::isUnreliableSignatureType(
    return false;
    }
 
+bool OMR::ValuePropagation::canComponentClassBeTrustedForFixedArrayClass(TR_OpaqueClassBlock *componentClass)
+   {
+   return true;
+   }
+
+bool OMR::ValuePropagation::canBeTrustedAsFixedClass(TR::SymbolReference *symRef, TR_OpaqueClassBlock *classObject)
+   {
+   return true;
+   }
+
 void OMR::ValuePropagation::doDelayedTransformations()
    {
    ListIterator<TR_TreeTopNodePair> treesIt1(&_scalarizedArrayCopies);

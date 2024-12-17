@@ -662,6 +662,24 @@ class ValuePropagation : public TR::Optimization
    virtual bool isUnreliableSignatureType(
       TR_OpaqueClassBlock *klass, TR_OpaqueClassBlock *&erased);
 
+   /**
+    * \brief Determine whether an array with the component class can be trusted as a fixed class
+    *
+    * \param componentClass The component class of an array.
+    *
+    * \return true if an array with the component class can be trusted as a fixed class, and false otherwise.
+    */
+   virtual bool canComponentClassBeTrustedForFixedArrayClass(TR_OpaqueClassBlock *componentClass);
+   /**
+    * \brief Determine whether a class can be trusted as a fixed class
+    *
+    * \param symRef The symbol reference of the class object.
+    * \param classObject The class object to be checked.
+    *
+    * \return true if a class can be trusted as a fixed class, and false otherwise.
+    */
+   virtual bool canBeTrustedAsFixedClass(TR::SymbolReference *symRef, TR_OpaqueClassBlock *classObject);
+
    struct ObjCloneInfo {
       TR_ALLOC(TR_Memory::ValuePropagation)
 
