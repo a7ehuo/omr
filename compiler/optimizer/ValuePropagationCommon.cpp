@@ -922,6 +922,73 @@ bool OMR::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arrayCopyNod
    return false;
    }
 
+/**
+ * @brief Collects the global indexes of the node and its children into the provided TR_BitVector
+ *
+ * @param[in] currNode : The TR::Node to be used
+ * @param[in] nodeList : The TR_BitVector that is updated with the global indexes of the node and its children
+ *
+ */
+static void setNodeOnList(TR::Node *currNode, TR_BitVector *nodeList)
+   {
+   if (nodeList->isSet(currNode->getGlobalIndex()))
+      return;
+
+   nodeList->set(currNode->getGlobalIndex());
+
+   for (int32_t i = 0; i < currNode->getNumChildren(); i++)
+      {
+      setNodeOnList(currNode->getChild(i), nodeList);
+      }
+   }
+
+/**
+ * @brief Find and replace all children of the currNode with a load of the symref if matching the following criteria:
+ *        The child matches the matchingNode or both the child and the matchingNode load the same object.
+ *        If the criteria is not met, only the children that do not appear on the skipDescendantsList will be recursively processed.
+ *
+ * @param[in] currNode : The TR::Node whose children will be updated
+ * @param[in] matchingNode : The TR::Node to be matched
+ * @param[in] symRef : The symeref to be used to create a load to replace the children of the currNode if matched
+ * @param[in] skipDescendantsList : The TR_BitVector that contains the global indexes of the nodes that should be skipped
+ * @param[in] trace : True if turning on the logging
+ * @param[in] comp : The TR::Compilation object
+ *
+ */
+static void findAndReplaceCommonedNodeWithLoadFromTemp(TR::Node *currNode,
+                                                       TR::Node *matchingNode,
+                                                       TR::SymbolReference *symRef,
+                                                       TR_BitVector *skipDescendantsList,
+                                                       bool trace,
+                                                       TR::Compilation *comp)
+   {
+   for (int32_t i = 0; i < currNode->getNumChildren(); i++)
+      {
+      TR::Node *childNode = currNode->getChild(i);
+
+      if ((childNode == matchingNode)
+          || ((((childNode->getOpCodeValue() == TR::aload) && (matchingNode->getOpCodeValue() == TR::aload)) ||
+               ((childNode->getOpCodeValue() == TR::iload) && (matchingNode->getOpCodeValue() == TR::iload))) &&
+              childNode->getOpCode().hasSymbolReference() &&
+              matchingNode->getOpCode().hasSymbolReference() &&
+              (childNode->getSymbolReference()->getReferenceNumber() == matchingNode->getSymbolReference()->getReferenceNumber())))
+         {
+         TR::Node *loadNode = TR::Node::createLoad(symRef);
+
+         childNode->recursivelyDecReferenceCount();
+         currNode->setAndIncChild(i, loadNode);
+
+         if (trace)
+            traceMsg(comp, "%s: currNode n%dn replace childNode n%dn with loadNode n%dn symRef #%d\n", __FUNCTION__, currNode->getGlobalIndex(),
+               childNode->getGlobalIndex(), loadNode->getGlobalIndex(), symRef->getReferenceNumber());
+         }
+      else if (!skipDescendantsList->isSet(childNode->getGlobalIndex()))
+         {
+         findAndReplaceCommonedNodeWithLoadFromTemp(childNode, matchingNode, symRef, skipDescendantsList, trace, comp);
+         }
+      }
+   }
+
 void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
    {
    bool is64BitTarget = comp()->target().is64Bit();
@@ -1440,41 +1507,50 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
             comp()->getDebug()->print(comp()->getOutFile(), comp()->getFlowGraph());
             }
          /*
-               ==== Before ===
-  _curTree---> n9n       treetop
-               n8n         call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
-               n3n           aload  <parm 0 [LSomeInterface;>[#419  Parm]
-               n4n           iconst 0
-               n5n           aload  <parm 1 [LSomeInterface;>[#420  Parm]
-               n6n           iconst 0
-               n7n           iload  TestSystemArraycopy4.ARRAY_SIZE I[#421  Static]
+               ==== Before modifying for null-restricted array check ===
+  _curTree---> n43n      treetop
+               n42n        call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
+               n257n         aload  <temp slot 9>[#464  Auto]
+               n38n          iload  <auto slot 4>[#423  Auto]
+               n39n          aload  <auto slot 5>[#431  Auto]
+               n40n          iload  <auto slot 4>[#423  Auto]
+               n41n          iload  <auto slot 3>[#422  Auto]
+               n47n      areturn
+               n46n        aload  <auto slot 5>[#431  Auto]
+               n2n       BBEnd </block_20> =====
 
-               ==== After ===
-               n48n      astore  <temp slot 3>[#429  Auto]
-               n3n         aload  <parm 0 [LSomeInterface;>[#419  Parm]
-               n52n      astore  <temp slot 5>[#431  Auto]
-               n5n         aload  <parm 1 [LSomeInterface;>[#420  Parm]
-    prevTT---> n56n      istore  <temp slot 7>[#433  Auto]
-               n7n         iload  TestSystemArraycopy4.ARRAY_SIZE I[#421  Static]
-  _curTree---> n9n       treetop
-               n8n         call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
-               n3n           ==>aload
-               n4n           iconst 0
-               n5n           ==>aload
-               n6n           iconst 0
-               n7n           ==>iload
-    nextTT---> ...
-               ...
-               ...
- slowBlock---> n39n      BBStart <block_-1>
-               n41n      treetop
-               n42n        call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V [#428  final native static Method] [flags 0x20500 0x0 ] (dontTransformArrayCopyCall )
-               n49n          aload  <temp slot 3>[#429  Auto]
-               n51n          iconst 0
-               n53n          aload  <temp slot 5>[#431  Auto]
-               n55n          iconst 0
-               n57n          iload  <temp slot 7>[#433  Auto]
-               n40n      BBEnd </block_-1>
+               ==== After modifying for null-restricted array check ===
+               n328n     astore  <temp slot 11>[#470  Auto]
+               n257n         aload  <temp slot 9>[#464  Auto]
+               n330n     istore  <temp slot 12>[#471  Auto]
+               n38n        iload  <auto slot 4>[#423  Auto]
+               n332n     astore  <temp slot 13>[#472  Auto]
+               n39n        aload  <auto slot 5>[#431  Auto]
+               n334n     istore  <temp slot 14>[#473  Auto]
+               n40n        iload  <auto slot 4>[#423  Auto]
+    prevTT---> n336n     istore  <temp slot 15>[#474  Auto]
+               n41n        iload  <auto slot 3>[#422  Auto]
+  _curTree---> n43n      treetop
+               n42n        call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
+               n339n         aload  <temp slot 11>[#470  Auto]
+               n38n          ==>iload
+               n338n         aload  <temp slot 13>[#472  Auto]
+               n40n          ==>iload
+               n41n          ==>iload
+    nextTT---> n47n      areturn
+               n340n       aload  <temp slot 13>[#472  Auto]
+
+
+ slowBlock---> n324n     BBStart <block_27> (freq 0) (cold)
+               n327n     treetop
+               n326n       call  java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
+               n329n         aload  <temp slot 11>[#470  Auto]
+               n331n         iload  <temp slot 12>[#471  Auto]
+               n333n         aload  <temp slot 13>[#472  Auto]
+               n335n         iload  <temp slot 14>[#473  Auto]
+               n337n         iload  <temp slot 15>[#474  Auto]
+               n448n     goto --> block_24 BBStart at n433n
+               n325n     BBEnd </block_27> (cold)
             */
 
          // Create the block that contains the System.arraycopy call which will be the slow path
@@ -1492,12 +1568,42 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 
          slowBlock->append(newCallTree);
 
+         // Collect a list of all the nodes appear before the current System.arraycopy tree.
+         // This should run before inserting the new store nodes.
+         // The purpose of this list is to prevent the child nodes of the System.arraycopy
+         // that are commoned before the System.arraycopy tree from being replaced.
+         // e.g.
+         // n1n Op1
+         //   n2n load src
+         // n3n treetop
+         //   n4n System.arraycopy
+         //     n5n load src
+         //     ...
+         // n8n Op2
+         //   ==> n1n <--- n2n under n1n should not be replaced with the new temp because n1n appears before System.arraycopy tree
+         // n11n Op3
+         //   ==> n2n <--- will be replaced in with new temp in findAndReplaceCommonedNodeWithLoadFromTemp
+         //
+         TR::TreeTop *itTT = _curTree->getEnclosingBlock()->startOfExtendedBlock()->getEntry();
+         TR_BitVector *skipDescendantsList = new (trStackMemory()) TR_BitVector(20, comp()->trMemory(), stackAlloc, growable);
+         while (itTT != _curTree)
+            {
+            setNodeOnList(itTT->getNode(), skipDescendantsList);
+            itTT = itTT->getNextTreeTop();
+            }
+
          TR::Node *oldCallNode = node;
          if (trace())
             traceMsg(comp(),"Creating temps for children of the original call node n%dn %p. new call node n%dn %p\n", oldCallNode->getGlobalIndex(), oldCallNode, newCallNode->getGlobalIndex(), newCallNode);
 
          TR::SymbolReference * dstArrRefSymRef = NULL;
          TR::SymbolReference * srcArrRefSymRef = NULL;
+         struct NodeSymRefPair
+            {
+            TR::Node            *origNode;
+            TR::SymbolReference *newSymRef;
+            };
+         TR_ScratchList<NodeSymRefPair> nodeSymRefPairList(trMemory());
 
          // Create temporaries for System.arraycopy arguments and replace the children of the new call node with the temps
          for (int32_t i = 0 ; i < oldCallNode->getNumChildren(); ++i)
@@ -1530,10 +1636,22 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 
                if (child == srcObjNode)
                   srcArrRefSymRef = newSymbolReference;
+
+               // Replace the child of the original call node with the new load
+               TR::Node *loadNode = TR::Node::createLoad(oldCallNode, newSymbolReference);
+               child->recursivelyDecReferenceCount();
+               oldCallNode->setAndIncChild(i, loadNode);
+
+               struct NodeSymRefPair *pair = (struct NodeSymRefPair *)trMemory()->allocateMemory(sizeof(NodeSymRefPair), stackAlloc);
+               pair->origNode = child;
+               pair->newSymRef = newSymbolReference;
+               nodeSymRefPairList.add(pair);
+               if (trace())
+                  traceMsg(comp(),"Inserted nodeSymRefPairList %p n%dn %p #%d\n", pair->origNode, pair->origNode->getGlobalIndex(), pair->newSymRef, pair->newSymRef->getReferenceNumber());
                }
 
             if (trace())
-               traceMsg(comp(),"Created child n%dn %p for new call node n%dn %p\n", value->getGlobalIndex(), value, newCallNode->getGlobalIndex(), newCallNode);
+               traceMsg(comp(),"Created child n%dn %p for new call node n%dn %p\n\n", value->getGlobalIndex(), value, newCallNode->getGlobalIndex(), newCallNode);
 
             newCallNode->getChild(i)->recursivelyDecReferenceCount();
             newCallNode->setAndIncChild(i, value);
@@ -1547,6 +1665,22 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
          while ((nextTT->getNode()->getOpCodeValue() == TR::BBEnd) ||
                 (nextTT->getNode()->getOpCodeValue() == TR::BBStart))
             nextTT = nextTT->getNextTreeTop();
+
+         itTT = _curTree->getNextTreeTop();
+         TR::TreeTop *exitTT = _curTree->getEnclosingBlock()->getEntry()->getExtendedBlockExitTreeTop();
+
+         // Replace all the commoned destination array reference and source array reference nodes with the new temps
+         while (itTT != exitTT)
+            {
+            TR::Node *itNode = itTT->getNode();
+
+            ListIterator<NodeSymRefPair> iter(&nodeSymRefPairList);
+            for (NodeSymRefPair *pair = iter.getFirst(); pair; pair = iter.getNext())
+               {
+               findAndReplaceCommonedNodeWithLoadFromTemp(itNode, pair->origNode, pair->newSymRef, skipDescendantsList, trace(), comp());
+               }
+            itTT = itTT->getNextTreeTop();
+            }
 
          if (trace())
             {
