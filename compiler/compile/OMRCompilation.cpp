@@ -964,6 +964,13 @@ int32_t OMR::Compilation::compile()
       TR::Compiler->debug.breakPoint();
       }
 
+   if (self()->getOption(TR_GenerateGPFForDebug))
+      {
+      int *tmpPtr = NULL;
+      fprintf(stderr, "\n=== Generate GPF for debug %s ===\n", self()->signature());
+      *tmpPtr = 10;
+      }
+
 #if defined(AIXPPC)
    if (self()->getOption(TR_DebugBeforeCompile))
       {

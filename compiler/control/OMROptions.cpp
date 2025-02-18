@@ -859,6 +859,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"GCRresetCount=",       "R<nnn>\tthe value to which the counter is reset to after being tripped by guarded counting recompilations (positive value)",
     TR::Options::setCount, offsetof(OMR::Options,_GCRResetCount), 0, "F%d"},
    {"generateCompleteInlineRanges", "O\tgenerate meta data ranges for each change in inliner depth", SET_OPTION_BIT(TR_GenerateCompleteInlineRanges), "F"},
+   {"generateGPFForDebug", "O\tGenerate a GPF for debug", SET_OPTION_BIT(TR_GenerateGPFForDebug), "F"},
    {"help",               " \tdisplay this help information", TR::Options::helpOption, 0, 0, "F", NOT_IN_SUBSET},
    {"help=",              " {regex}\tdisplay help for options whose names match {regex}", TR::Options::helpOption, 1, 0, "F", NOT_IN_SUBSET},
    {"highCodeCacheOccupancyBCount=", "R<nnn>\tthe initial invocation count used during high code cache occupancy for methods with loops",
