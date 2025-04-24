@@ -875,7 +875,7 @@ enum TR_CompilationOptions
    TR_DisableConservativeInlining                     = 0x00000800 + 27,
    TR_EnableExpensiveOptsAtWarm                       = 0x00001000 + 27,
    TR_DisableCheckcastAndProfiledGuardCoalescer       = 0x00002000 + 27,
-   // Available                                       = 0x00004000 + 27,
+   TR_DisableCheckOnNumInternalPointersInJProfilingValue = 0x00004000 + 27,
    TR_DisableVectorRegGRA                             = 0x00008000 + 27,
    TR_DisableSIMD                                     = 0x00010000 + 27,
    // Available                                       = 0x00020000 + 27,
