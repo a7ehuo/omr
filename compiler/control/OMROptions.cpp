@@ -290,6 +290,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"disableCFGSimplification",           "O\tdisable Control Flow Graph simplification",      TR::Options::disableOptimization, CFGSimplification, 0, "P"},
    {"disableCheapWarmOpts",               "O\tenable cheap warm optimizations",               SET_OPTION_BIT(TR_DisableCheapWarmOpts), "F"},
    {"disableCheckcastAndProfiledGuardCoalescer", "O\tdisable checkcast and profiled guard coalescence optimization ",   SET_OPTION_BIT(TR_DisableCheckcastAndProfiledGuardCoalescer), "F"},
+   {"disableCheckOnNumInternalPointersInJProfilingValue", "O\tdisable check on num of internal pointers in JProfilingValue", SET_OPTION_BIT(TR_DisableCheckOnNumInternalPointersInJProfilingValue), "F"},
    {"disableCHOpts",                      "O\tdisable CHTable based optimizations",            SET_OPTION_BIT(TR_DisableCHOpts), "F"},
    {"disableClassChainSharing",            "M\tdisable class sharing", RESET_OPTION_BIT(TR_EnableClassChainSharing), "F", NOT_IN_SUBSET},
    {"disableClassChainValidationCaching",  "M\tdisable class chain validation caching", RESET_OPTION_BIT(TR_EnableClassChainValidationCaching), "F", NOT_IN_SUBSET},
