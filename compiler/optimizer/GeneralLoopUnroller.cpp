@@ -398,13 +398,14 @@ void TR_LoopUnroller::unrollLoopOnce(TR_RegionStructure *loop, TR_StructureSubGr
     }
 
     processSwingQueue();
-
+#if 0
     if (trace()) {
         traceMsg(comp(), "\nstructure after cloning the loop for the %dth time:\n\n", _iteration);
         getDebug()->print(comp()->getOutFile(), _rootStructure, 6);
         getDebug()->print(comp()->getOutFile(), _cfg);
         comp()->dumpMethodTrees("method trees:");
     }
+#endif
     // We are done.
 }
 
@@ -1683,11 +1684,60 @@ int32_t TR_LoopUnroller::unroll(TR_RegionStructure *loop, TR_StructureSubGraphNo
     prepareForArrayShadowRenaming(loop);
     refineArrayAliasing();
 
+    static const char *enableMoveAsyncCheckOutUnrolledLoopEnv = feGetEnv("TR_EnableMoveAsyncCheckOutUnrolledLoop");
+    bool enableMoveAsyncCheckOutUnrolledLoop = comp()->getOption(TR_EnableMoveAsyncCheckOutUnrolledLoop) || enableMoveAsyncCheckOutUnrolledLoopEnv;
+    bool removedAsyncCheck = false;
+
+    // Remove any asynch check from the original blocks
+    if (enableMoveAsyncCheckOutUnrolledLoop) {
+       TR_ScratchList<TR::Block> blocksInRegion(trMemory());
+       loop->getBlocks(&blocksInRegion);
+
+       ListIterator<TR::Block> it(&blocksInRegion);
+       TR::Block *block;
+       for (block = it.getCurrent(); block; block = it.getNext()) {
+           if (block->getNumber() < _numNodes) {
+               for (TR::TreeTop *tt = block->getEntry()->getNextTreeTop(); tt != block->getExit();) {
+                   if (tt->getNode()->getOpCodeValue() == TR::asynccheck) {
+
+                       TR::TreeTop *ayncCheckTT = tt;
+                       tt = ayncCheckTT->getNextRealTreeTop();
+
+                       TR::TransformUtil::removeTree(comp(), ayncCheckTT);
+                       removedAsyncCheck = true;
+
+                       if (trace())
+                           traceMsg(comp(), "%s: DEBUG block_%d: Found and remove asynccheck n%dn before unrolling\n", __FUNCTION__, block->getNumber(), tt->getNode()->getGlobalIndex());
+                  } else {
+                       tt = tt->getNextRealTreeTop();
+                  }
+               }
+           }
+       }
+    }
+
     int32_t unrollCount = (_unrollCount + 1) / _vectorSize - 1;
 
     for (_iteration = 1; _iteration <= unrollCount; _iteration++) {
         unrollLoopOnce(loop, branchNode, _iteration == unrollCount);
         refineArrayAliasing();
+    }
+
+    if (enableMoveAsyncCheckOutUnrolledLoop && removedAsyncCheck) {
+        // add the async tree into the loopheader
+        //
+        TR::Block *loopHeader = loop->getEntryBlock();
+        TR::Node *bbstartNode = loopHeader->getEntry()->getNode();
+        TR::TreeTop *nextTree = loopHeader->getEntry()->getNextTreeTop();
+
+        TR::TreeTop *asyncTT = TR::TreeTop::create(comp(),
+            TR::Node::createWithSymRef(bbstartNode, TR::asynccheck, 0, comp()->getSymRefTab()->findOrCreateAsyncCheckSymbolRef(comp()->getMethodSymbol())));
+
+        loopHeader->getEntry()->join(asyncTT);
+        asyncTT->join(nextTree);
+
+        if (trace())
+            traceMsg(comp(), "%s: DEBUG loopHeader block_%d insert asyncTT n%dn\n", __FUNCTION__, loopHeader->getNumber(), asyncTT->getNode()->getGlobalIndex());
     }
 
     if (!_newSymRefs.isEmpty())
@@ -1696,12 +1746,14 @@ int32_t TR_LoopUnroller::unroll(TR_RegionStructure *loop, TR_StructureSubGraphNo
     modifyOriginalLoop(loop, branchNode);
 
     _cfg->setStructure(_rootStructure);
+#if 0
     if (trace()) {
         traceMsg(comp(), "\nstructure after unrolling on loop %d is finished:\n\n", loop->getNumber());
         getDebug()->print(comp()->getOutFile(), _rootStructure, 6);
         getDebug()->print(comp()->getOutFile(), _cfg);
         comp()->dumpMethodTrees(" xxxx Tree tops after unrolling:");
     }
+#endif
 
     return _unrollCount * 5;
 }

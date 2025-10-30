@@ -1242,6 +1242,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
      SET_OPTION_BIT(TR_EnableMHRelocatableCompile), "F", NOT_IN_SUBSET },
     { "enableMonitorCacheLookup", "O\tenable  monitor cache lookup under lock nursery ",
      SET_OPTION_BIT(TR_EnableMonitorCacheLookup), "F" },
+    { "enableMoveAsyncCheckOutUnrolledLoop", "O\tEnable move aynchCheck out of the unrolled loop", SET_OPTION_BIT(TR_EnableMoveAsyncCheckOutUnrolledLoop), "F" },
     { "enableMultipleGCRPeriods", "M\tallow JIT to get in and out of GCR", SET_OPTION_BIT(TR_EnableMultipleGCRPeriods),
      "F", NOT_IN_SUBSET },
     { "enableMutableCallSiteGuards",

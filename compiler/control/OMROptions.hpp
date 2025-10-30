@@ -510,7 +510,7 @@ enum TR_CompilationOptions {
     // Available                                             = 0x00010000 + 13,
     // Available                                             = 0x00020000 + 13,
     TR_EnableMonitorCacheLookup                              = 0x00040000 + 13,
-    // Available                                             = 0x00080000 + 13,
+    TR_EnableMoveAsyncCheckOutUnrolledLoop                   = 0x00080000 + 13,
     // Available                                             = 0x00100000 + 13,
     // Available                                             = 0x00200000 + 13,
     // Available                                             = 0x00400000 + 13,
