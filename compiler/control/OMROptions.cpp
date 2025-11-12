@@ -1232,6 +1232,7 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
     { "enableLocalVPSkipLowFreqBlock", "O\tSkip processing of low frequency blocks in localVP",
      SET_OPTION_BIT(TR_EnableLocalVPSkipLowFreqBlock), "F" },
     { "enableLoopEntryAlignment", "O\tenable loop Entry alignment", SET_OPTION_BIT(TR_EnableLoopEntryAlignment), "F" },
+    { "enableLoopITableAfterLastITableCacheCheck", "O\tenable loop Entry alignment", SET_OPTION_BIT(TR_EnableLoopITableAfterLastITableCacheCheck), "F" },
     { "enableLoopVersionerCountAllocFences",
      "O\tallow loop versioner to count allocation fence nodes on PPC toward a profiled guard's block total", SET_OPTION_BIT(TR_EnableLoopVersionerCountAllocationFences), "F" },
     { "enableLowerCompilationLimitsDecisionMaking",
