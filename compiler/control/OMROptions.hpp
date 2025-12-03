@@ -463,8 +463,8 @@ enum TR_CompilationOptions {
     TR_DisableInlineWriteBarriersRT                          = 0x08000000 + 11, // RTJ
     TR_EnableLimitCompilationToVeryHot                       = 0x10000000 + 11,
     TR_DisableNewInliningInfrastructure                      = 0x20000000 + 11,
-    // Available                                             = 0x40000000 + 11,
-    // Available                                             = 0x80000000 + 11,
+    TR_EnableITableFavSuccessPathAfterLastITableCacheCheck   = 0x40000000 + 11,
+    TR_EnableITableSkipPICSlots                              = 0x80000000 + 11,
 
     // Option word 12
     // Available                                             = 0x00000020 + 12,
