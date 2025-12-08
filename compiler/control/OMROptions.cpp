@@ -1223,6 +1223,8 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
      "O\tenable skipping inserting PICs before last iTable cache check", SET_OPTION_BIT(TR_EnableITableSkipPICSlots), "F" },
     { "enableITableSkipPICSlotsForThreeMethods",
      "O\tenable skipping inserting PICs before last iTable cache check to the three methods", SET_OPTION_BIT(TR_EnableITableSkipPICSlotsForThreeMethods), "F" },
+    { "enableITableSkipPICSlotsForThreeMethods2",
+     "O\tenable skipping inserting PICs before last iTable cache check to the three methods", SET_OPTION_BIT(TR_EnableITableSkipPICSlotsForThreeMethods2), "F" },
     { "enableIVTT", "O\tenable IV Type Transformation", TR::Options::enableOptimization, IVTypeTransformation, 0, "P" },
     { "enableJCLInline", "O\tenable JCL Integer and Long methods inlining", SET_OPTION_BIT(TR_EnableJCLInline), "F" },
     { "enableJITHelpershashCodeImpl", "O\tenable java version of object hashCode()",

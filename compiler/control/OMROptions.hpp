@@ -468,7 +468,7 @@ enum TR_CompilationOptions {
 
     // Option word 12
     TR_EnableITableSkipPICSlotsForThreeMethods               = 0x00000020 + 12,
-    // Available                                             = 0x00000040 + 12,
+    TR_EnableITableSkipPICSlotsForThreeMethods2              = 0x00000040 + 12,
     TR_DisablePartialInlining                                = 0x00000080 + 12,
     TR_AssumeStartupPhaseUntilToldNotTo                      = 0x00000100 + 12,
     // Available                                             = 0x00000200 + 12,
