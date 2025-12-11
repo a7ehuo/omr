@@ -237,6 +237,14 @@ void TR_UseDefInfo::prepareUseDefInfo(bool requiresGlobals, bool prefersGlobals,
         return;
     }
 
+    int numRegisters = _useDefForRegs ? comp()->cg()->getNumberOfGlobalRegisters() : 0;
+    int totalNumDefsForSymbol = _numSymbols + numRegisters;
+    if (totalNumDefsForSymbol == 0) {
+        logprints(trace(), log,
+            "Use/Def info: return since the size of aux._defsForSymbol[] is zero\n");
+        return;
+    }
+
     // Adjust the use/def index for each node now that the sizes are known.
     // There is still potential for index overflow when the adjustment is done.
     //
@@ -279,10 +287,8 @@ void TR_UseDefInfo::prepareUseDefInfo(bool requiresGlobals, bool prefersGlobals,
     //      _useDefInfo[i].GrowTo(getNumDefNodes());
     _isUseDefInfoValid = true;
 
-    int numRegisters = _useDefForRegs ? comp()->cg()->getNumberOfGlobalRegisters() : 0;
-
-    aux._defsForSymbol.resize(_numSymbols + numRegisters, NULL);
-    for (i = 0; i < _numSymbols + numRegisters; ++i)
+    aux._defsForSymbol.resize(totalNumDefsForSymbol, NULL);
+    for (i = 0; i < totalNumDefsForSymbol; ++i)
         aux._defsForSymbol[i] = new (aux._region) TR_BitVector(aux._region);
 
     // Initialize the array with definitions from method entry
