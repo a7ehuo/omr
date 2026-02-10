@@ -410,6 +410,8 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
      coldBlockMarker, 0, "P" },
     { "disableColdBlockOutlining", "O\tdisable outlining of cold blocks", TR::Options::disableOptimization,
      coldBlockOutlining, 0, "P" },
+    { "disableCompactInstanceField", "O\tdisable compact instance fields",
+     SET_OPTION_BIT(TR_DisableCompactInstanceField), "F" },
     { "disableCompactLocals", "O\tdisable compact locals", TR::Options::disableOptimization, compactLocals, 0, "P" },
     { "disableCompactNullChecks", "O\tdisable compact null checks", TR::Options::disableOptimization, compactNullChecks,
      0, "P" },
