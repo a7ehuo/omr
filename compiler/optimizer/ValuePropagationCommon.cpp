@@ -46,6 +46,7 @@
 #include "env/ObjectModel.hpp"
 #include "env/TRMemory.hpp"
 #include "env/TypeLayout.hpp"
+#include "env/VerboseLog.hpp"
 #include "optimizer/TransformUtil.hpp"
 #include "il/Block.hpp"
 #include "il/DataTypes.hpp"
@@ -848,6 +849,73 @@ bool OMR::ValuePropagation::canRunTransformToArrayCopy()
 
 bool OMR::ValuePropagation::transformUnsafeCopyMemoryCall(TR::Node *arrayCopyNode) { return false; }
 
+
+static bool isMethodUnsafeToSkipArrayCopyChecks(TR::Compilation *comp, TR_ResolvedMethod *m, bool trace)
+{
+    if (!m)
+        return false;
+
+    const char *className = m->classNameChars();
+    int32_t classLen  = m->classNameLength();
+    const char *methodName = m->nameChars();
+    int32_t methodLen = m->nameLength();
+
+    if (!className || (classLen <= 0) || !methodName || (methodLen <= 0))
+        return false;
+
+    if ((classLen == 31) && !strncmp(className, "java/lang/AbstractStringBuilder", 31)
+        && (methodLen == 11) && !strncmp(methodName, "putStringAt", 11)) {
+        logprintf(trace, comp->log(), "%s: AbstractStringBuilder.putStringAt return true\n", __FUNCTION__);
+        return true;
+    }
+
+    if ((classLen == 16) && !strncmp(className, "java/lang/String", 16)
+        && (methodLen == 8) && !strncmp(methodName, "getBytes", 8)) {
+        logprintf(trace, comp->log(), "%s: return true\n", __FUNCTION__);
+        return true;
+    }
+
+    if ((classLen == 23) && !strncmp(className, "java/lang/StringBuilder", 23)) {
+        if ((methodLen == 4) && !strncmp(methodName, "move", 4)) {
+            logprintf(trace, comp->log(), "%s: return true\n", __FUNCTION__);
+            return true;
+        }
+
+        if ((methodLen == 6) && !strncmp(methodName, "append", 6)) {
+            logprintf(trace, comp->log(), "%s: return true\n", __FUNCTION__);
+            return true;
+        }
+
+        if ((methodLen == 18) && !strncmp(methodName, "ensureCapacityImpl", 18)) {
+            logprintf(trace, comp->log(), "%s: return true\n", __FUNCTION__);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool hasUnsafeToSkipArrayCopyChecksMethodOnInlinedStack(TR::Compilation *comp, TR::Node *node, bool trace)
+{
+    if (!comp || !node)
+       return false;
+
+    if (isMethodUnsafeToSkipArrayCopyChecks(comp, comp->getCurrentMethod(), trace))
+       return true;
+
+    int16_t callerIndex = node->getInlinedSiteIndex();
+    while (callerIndex > -1) {
+        TR_ResolvedMethod *m = comp->getInlinedResolvedMethod(callerIndex);
+        if (isMethodUnsafeToSkipArrayCopyChecks(comp, m, trace))
+            return true;
+
+        TR_InlinedCallSite callSite = comp->getInlinedCallSite(callerIndex);
+        callerIndex = callSite._byteCodeInfo.getCallerIndex();
+    }
+
+    return false;
+}
+
 void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
 {
     OMR::Logger *log = comp()->log();
@@ -1440,6 +1508,30 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
             canSkipAllChecksOnArrayCopy = node->isNodeRecognizedArrayCopyCall();
             node->setNodeIsRecognizedArrayCopyCall(false);
         }
+#if J9_PROJECT_SPECIFIC
+        static char *disableStringCmpsDcmpsArrayCopyFix = feGetEnv("TR_DisableStringCmpsDcmpsArrayCopyFix");
+
+        if (canSkipAllChecksOnArrayCopy
+            && !disableStringCmpsDcmpsArrayCopyFix
+            && (isStringCompressedArrayCopy || isStringDecompressedArrayCopy)) {
+            if (hasUnsafeToSkipArrayCopyChecksMethodOnInlinedStack(comp(), node, trace())) {
+                canSkipAllChecksOnArrayCopy = false;
+            }
+        }
+#endif
+        if (trace()) {
+            log->printf("%s: n%dn %p canSkipAllChecksOnArrayCopy %d isStringCompressedArrayCopy %d isStringDecompressedArrayCopy %d isRecognizedMultiLeafArrayCopy %d\n"
+                       , __FUNCTION__, node->getGlobalIndex(), node, canSkipAllChecksOnArrayCopy,
+                       isStringCompressedArrayCopy, isStringDecompressedArrayCopy, isRecognizedMultiLeafArrayCopy);
+        }
+
+        if (comp()->getOptions()->isAnyVerboseOptionSet()) {
+            TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: canSkipAllChecksOnArrayCopy %d: methodId %d safeToSkipChecksOnArrayCopies %d isRecognizedMultiLeafArrayCopy %d %s\n", __FUNCTION__,
+                  canSkipAllChecksOnArrayCopy, comp()->getOwningMethodSymbol(node->getOwningMethod())->getRecognizedMethod(),
+                  comp()->getOwningMethodSymbol(node->getOwningMethod())->safeToSkipChecksOnArrayCopies(), isRecognizedMultiLeafArrayCopy, comp()->signature());
+            TR_VerboseLog::writeLineLocked(TR_Vlog_INFO, "%s: canSkipAllChecksOnArrayCopy %d: isStringCompressedArrayCopy %d isStringDecompressedArrayCopy %d %s\n", __FUNCTION__,
+                  canSkipAllChecksOnArrayCopy, isStringCompressedArrayCopy, isStringDecompressedArrayCopy, comp()->signature());
+        }
 
         if (comp()->getMethodHotness() == hot && comp()->getRecompilationInfo() && optimizer()->switchToProfiling()) {
             dumpOptDetails(comp(), "%s enabling profiling: it is useful to profile arraycopy calls\n", OPT_DETAILS);
@@ -1561,16 +1653,57 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
             bool needDstBndChk = !dstArrayInfo || dstOffHigh > TR::getMaxSigned<TR::Int32>() - copyLenHigh
                 || dstOffHigh + copyLenHigh > dstArrayInfo->lowBound();
 
+            if ((!needSrcBndChk || !needDstBndChk) && (isStringCompressedArrayCopy || isStringDecompressedArrayCopy)) {
+                // Force bounds checks for String helper copies (robustness under racy callers)
+                needSrcBndChk = true;
+                needDstBndChk = true;
+            }
+
             if (needSrcBndChk) {
                 if (!srcArrayLength) {
                     srcArrayLength = TR::Node::create(TR::arraylength, 1, srcObjNode);
                     srcArrayLength->setIsNonNegative(true);
                 }
-                checkNode = TR::Node::create(TR::isub, 2, srcArrayLength, copyLenNode);
+
+                // DeompressedArrayCopy:
+                // UTF‑16-in-byte[] → UTF‑16-in-byte[] or UTF‑16-in-byte[] → char[]
+                // srcArrayLength is in bytes
+                // copyLen is in UTF‑16 code units
+                TR::Node *srcArrayLenToCheck = srcArrayLength;
+                if (isStringDecompressedArrayCopy
+                   && ((recognizedMethod == TR::java_lang_String_decompressedArrayCopy_BIBII)
+                       || (recognizedMethod == TR::java_lang_String_decompressedArrayCopy_BICII))) {
+                    TR::Node *shift = TR::Node::create(TR::iconst, 0);  // or reuse a cached const 1
+                    shift->setInt(1);
+                    // srcArrayLenToCheck = srcArrayLenToCheck >> 1  (bytes -> UTF16 code units)
+                    srcArrayLenToCheck = TR::Node::create(TR::iushr /*or ishr*/, 2, srcArrayLength, shift);
+                    srcArrayLenToCheck->setIsNonNegative(true); // still non-negative
+                    if (trace()) log->printf("%s: decompressed srcArrayLenToCheck n%dn\n", __FUNCTION__, srcArrayLenToCheck->getGlobalIndex());
+                }
+
+                // CompressedArrayCopy:
+                // If source is char[] carrying packed compressed bytes, arraylength(src)
+                // is char slots, but copyLen/srcOff are logical compressed-byte units.
+                // Convert char slots -> logical compressed units by << 1.
+                //
+                if (isStringCompressedArrayCopy &&
+                    (recognizedMethod == TR::java_lang_String_compressedArrayCopy_CIBII ||
+                     recognizedMethod == TR::java_lang_String_compressedArrayCopy_CICII)) {
+                    TR::Node *shift1 = TR::Node::create(TR::iconst, 0);
+                    shift1->setInt(1);
+                    // srcLenLogical = srcLenChars << 1
+                    srcArrayLenToCheck = TR::Node::create(TR::ishl, 2, srcArrayLength, shift1);
+                    srcArrayLenToCheck->setIsNonNegative(true);
+                    if (trace()) log->printf("%s: compressed srcArrayLenToCheck n%dn\n", __FUNCTION__, srcArrayLenToCheck->getGlobalIndex());
+                }
+
+                // check: srcOff <= srcArrayLenToCheck - copyLen
+                checkNode = TR::Node::create(TR::isub, 2, srcArrayLenToCheck, copyLenNode);
                 checkNode = TR::Node::create(TR::ArrayCopyBNDCHK, 2, checkNode, srcOffNode);
                 checkNode->setSymbolReference(bndChkSymRef);
                 prevTree = TR::TreeTop::create(comp(), prevTree, checkNode);
                 setEnableSimplifier();
+                if (trace()) log->printf("%s: needSrcBndChk checkNode n%dn\n", __FUNCTION__, checkNode->getGlobalIndex());
             }
 
             if (needDstBndChk) {
@@ -1578,11 +1711,42 @@ void OMR::ValuePropagation::transformArrayCopyCall(TR::Node *node)
                     dstArrayLength = TR::Node::create(TR::arraylength, 1, dstObjNode);
                     dstArrayLength->setIsNonNegative(true);
                 }
-                checkNode = TR::Node::create(TR::isub, 2, dstArrayLength, copyLenNode);
+                // UTF‑16-in-byte[] → UTF‑16-in-byte[] or char[] → UTF‑16-in-byte[]
+                // dstArrayLength is in bytes
+                // copyLen is in UTF‑16 code units
+                TR::Node *dstArrayLenToCheck = dstArrayLength;
+                if (isStringDecompressedArrayCopy
+                   && ((recognizedMethod == TR::java_lang_String_decompressedArrayCopy_BIBII)
+                       || (recognizedMethod == TR::java_lang_String_decompressedArrayCopy_CIBII))) {
+                    // dstArrayLenToCheck = dstArrayLength >> 1  (bytes -> UTF16 code units)
+                    TR::Node *shift = TR::Node::create(TR::iconst, 0);  // or reuse a cached const 1
+                    shift->setInt(1);
+                    dstArrayLenToCheck = TR::Node::create(TR::iushr /*or ishr*/, 2, dstArrayLength, shift);
+                    dstArrayLenToCheck->setIsNonNegative(true); // still non-negative
+                    if (trace()) log->printf("%s: decompressed dstArrayLenToCheck n%dn\n", __FUNCTION__, dstArrayLenToCheck->getGlobalIndex());
+                }
+
+                // CompressedArrayCopy:
+                // If destination is char[] carrying packed compressed bytes, convert char slots
+                // -> logical compressed units by << 1.
+                //
+                if (isStringCompressedArrayCopy &&
+                    (recognizedMethod == TR::java_lang_String_compressedArrayCopy_BICII ||
+                     recognizedMethod == TR::java_lang_String_compressedArrayCopy_CICII)) {
+                    TR::Node *shift1 = TR::Node::create(TR::iconst, 0);
+                    shift1->setInt(1);
+                    // dstLenLogical = dstLenChars << 1
+                    dstArrayLenToCheck = TR::Node::create(TR::ishl, 2, dstArrayLength, shift1);
+                    dstArrayLenToCheck->setIsNonNegative(true);
+                    if (trace()) log->printf("%s: compressed dstArrayLenToCheck n%dn\n", __FUNCTION__, dstArrayLenToCheck->getGlobalIndex());
+                }
+                // check: dstOff <= dstArrayLenToCheck - copyLen
+                checkNode = TR::Node::create(TR::isub, 2, dstArrayLenToCheck, copyLenNode);
                 checkNode = TR::Node::create(TR::ArrayCopyBNDCHK, 2, checkNode, dstOffNode);
                 checkNode->setSymbolReference(bndChkSymRef);
                 prevTree = TR::TreeTop::create(comp(), prevTree, checkNode);
                 setEnableSimplifier();
+                if (trace()) log->printf("%s: needDstBndChk checkNode n%dn\n", __FUNCTION__, checkNode->getGlobalIndex());
             }
         }
 
