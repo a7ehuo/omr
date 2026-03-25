@@ -741,19 +741,18 @@ void OMR::CodeGenerator::insertDebugCounters()
             } else {
                 // newarray
                 int32_t type = node->getChild(node->getNumChildren() - 1)->getInt();
-                const size_t typeNameSize = 30;
-                char typeName[typeNameSize];
+                char typeName[30];
                 switch (type) {
                     case 4:
-                        snprintf(typeName, typeNameSize, "boolean");
+                        sprintf(typeName, "boolean");
                         break;
                     case 8:
-                        snprintf(typeName, typeNameSize, "byte");
+                        sprintf(typeName, "byte");
                     case 5:
-                        snprintf(typeName, typeNameSize, "char");
+                        sprintf(typeName, "char");
                         break;
                     default:
-                        snprintf(typeName, typeNameSize, "non-char");
+                        sprintf(typeName, "non-char");
                         break;
                 }
 

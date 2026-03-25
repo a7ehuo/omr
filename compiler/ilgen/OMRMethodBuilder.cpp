@@ -386,10 +386,9 @@ const char *OMR::MethodBuilder::adjustNameForInlinedSite(const char *name)
         return name;
 
     // prefix with _INL<index>_ and return
-    // 4 ("_INL") + max 10 digits + 1 ("_") + original name string + trailing zero
-    const size_t newNameSize = (4 + 10 + 1 + 1 + strlen(name)) * sizeof(char);
-    char *newName = (char *)_comp->trMemory()->allocateHeapMemory(newNameSize);
-    snprintf(newName, newNameSize, "_INL%u_%s", _inlineSiteIndex, name);
+    char *newName = (char *)_comp->trMemory()->allocateHeapMemory((4 + 10 + 1 + 1 + strlen(name))
+        * sizeof(char)); // 4 ("_INL") + max 10 digits + 1 ("_") + original name string + trailing zero
+    sprintf(newName, "_INL%u_%s", _inlineSiteIndex, name);
     return (const char *)newName;
 }
 

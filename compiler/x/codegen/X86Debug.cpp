@@ -204,38 +204,34 @@ void TR_Debug::printPrefix(OMR::Logger *log, TR::Instruction *instr)
 void TR_Debug::printDependencyConditions(OMR::Logger *log, TR::RegisterDependencyGroup *conditions,
     uint8_t numConditions, char *prefix)
 {
-    const size_t bufSize = 32;
-    char buf[bufSize];
+    char buf[32];
     char *cursor;
     int len, i;
 
     for (i = 0; i < numConditions; i++) {
         cursor = buf;
-        size_t remainingSize = bufSize;
         memset(buf, ' ', 23);
-        len = snprintf(cursor, remainingSize, "    %s[%d]", prefix, i);
+        len = sprintf(cursor, "    %s[%d]", prefix, i);
         *(cursor + len) = ' ';
         cursor += 12;
-        remainingSize -= 12;
 
         *(cursor++) = '(';
-        remainingSize--;
         TR::RegisterDependency *regDep = conditions->getRegisterDependency(i);
         if (regDep->isNoReg()) {
-            len = snprintf(cursor, remainingSize, "NoReg");
+            len = sprintf(cursor, "NoReg");
         } else if (regDep->isByteReg()) {
-            len = snprintf(cursor, remainingSize, "ByteReg");
+            len = sprintf(cursor, "ByteReg");
         } else if (regDep->isBestFreeReg()) {
-            len = snprintf(cursor, remainingSize, "BestFreeReg");
+            len = sprintf(cursor, "BestFreeReg");
         } else if (regDep->isSpilledReg()) {
-            len = snprintf(cursor, remainingSize, "SpilledReg");
+            len = sprintf(cursor, "SpilledReg");
         } else {
             TR::RealRegister::RegNum r = regDep->getRealRegister();
-            len = snprintf(cursor, remainingSize, "%s", getName(_cg->machine()->getRealRegister(r)));
+            len = sprintf(cursor, "%s", getName(_cg->machine()->getRealRegister(r)));
         }
 
         *(cursor + len) = ')';
-        *(cursor + len + 1) = 0x00;
+        *(cursor + 9) = 0x00;
 
         log->prints(buf);
 

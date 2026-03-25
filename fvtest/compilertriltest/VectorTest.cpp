@@ -366,8 +366,7 @@ TEST_P(ParameterizedVectorTest, VLoadStore) {
     bool platformSupport = TR::CodeGenerator::getSupportsOpCodeForAutoSIMD(&cpu, loadOp) && TR::CodeGenerator::getSupportsOpCodeForAutoSIMD(&cpu, storeOp);
     SKIP_IF(!platformSupport, MissingImplementation) << "Opcode is not supported by the target platform";
 
-    const size_t inputTreesSize = 1024;
-    char inputTrees[inputTreesSize];
+    char inputTrees[1024];
     char *formatStr = "(method return= NoType args=[Address,Address]   "
                       "  (block                                        "
                       "     (vstorei%s  offset=0                       "
@@ -375,7 +374,7 @@ TEST_P(ParameterizedVectorTest, VLoadStore) {
                       "         (vloadi%s (aload parm=1)))             "
                       "     (return)))                                 ";
 
-    std::snprintf(inputTrees, inputTreesSize, formatStr, vt.toString(), vt.toString());
+    sprintf(inputTrees, formatStr, vt.toString(), vt.toString());
     auto trees = parseString(inputTrees);
     ASSERT_NOTNULL(trees);
 
@@ -419,8 +418,7 @@ TEST_P(ParameterizedVectorTest, VSplats) {
 
     SKIP_IF(!platformSupport, MissingImplementation) << "Opcode " << splatsOp.getName() << vt.toString() << " is not supported by the target platform";
 
-    const size_t inputTreesSize = 1024;
-    char inputTrees[inputTreesSize];
+    char inputTrees[1024];
     char *formatStr = "(method return= NoType args=[Address,Address]   "
                       "  (block                                        "
                       "     (vstorei%s  offset=0                       "
@@ -429,7 +427,7 @@ TEST_P(ParameterizedVectorTest, VSplats) {
                       "             (%s (aload parm=1))))              "
                       "     (return)))                                 ";
 
-    std::snprintf(inputTrees, inputTreesSize, formatStr, vt.toString(), vt.toString(), elementLoadOp.getName());
+    sprintf(inputTrees, formatStr, vt.toString(), vt.toString(), elementLoadOp.getName());
 
     auto trees = parseString(inputTrees);
     ASSERT_NOTNULL(trees);

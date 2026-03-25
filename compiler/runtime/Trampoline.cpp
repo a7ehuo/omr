@@ -75,8 +75,7 @@ void ppcCreateHelperTrampolines(uint8_t *trampPtr, int32_t numHelpers)
 {
     TR::CodeCacheManager &manager = TR::FrontEnd::instance()->codeCacheManager();
     TR::CodeCacheConfig &config = manager.codeCacheConfig();
-    const size_t nameSize = 256;
-    char name[nameSize];
+    char name[256];
 
     static TR_Processor proc = TR_DefaultPPCProcessor;
 
@@ -142,10 +141,11 @@ void ppcCreateHelperTrampolines(uint8_t *trampPtr, int32_t numHelpers)
         *(int32_t *)buffer = 0x4e800420;
         buffer += 4;
 
-        const static char *suffixString = " (trampoline)";
-        const int maxHelperNameLen = (int)nameSize - (int)strlen(suffixString) - 1;
         const char *helperName = TR::Options::findOrCreateDebug()->getRuntimeHelperName((TR_RuntimeHelper)cookie);
-        snprintf(name, nameSize, "%.*s%s", maxHelperNameLen, helperName, suffixString);
+        if (strlen(helperName) < 256)
+            sprintf(name, "%s (trampoline)", helperName);
+        else
+            sprintf(name, "unknown helper (trampoline)", helperName);
 
         manager.registerCompiledMethod(name, bufferStart, buffer - bufferStart);
         registerTrampoline(bufferStart, buffer - bufferStart, name);

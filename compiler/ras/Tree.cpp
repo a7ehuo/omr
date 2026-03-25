@@ -2123,9 +2123,8 @@ void TR_Debug::verifyBlocksPass2(TR::Node *node)
             verifyBlocksPass2(node->getChild(i));
 
         if (node->getLocalIndex() != 0) {
-            const size_t bufferSize = 150;
-            char buffer[bufferSize];
-            snprintf(buffer, bufferSize,
+            char buffer[150];
+            sprintf(buffer,
                 "BLOCK VERIFICATION ERROR -- node [%s] accessed outside of its (extended) basic block: %d time(s)\n",
                 getName(node), node->getLocalIndex());
 

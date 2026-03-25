@@ -384,9 +384,8 @@ bool SimpleRegex::match(TR::SimpleRegex *regex, const char *s, bool isCaseSensit
 
 bool SimpleRegex::match(TR::SimpleRegex *regex, int32_t i, bool isCaseSensitive)
 {
-    const size_t sSize = 20;
-    char s[sSize];
-    snprintf(s, sSize, "%d", i);
+    char s[20];
+    sprintf(s, "%d", i);
     return regex->match(s, isCaseSensitive, true);
 }
 
